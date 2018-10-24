@@ -40,3 +40,8 @@ CMakeCache.txt
 
 #vim
 *.swp
+
+#halite
+replays
+halite
+*.log
