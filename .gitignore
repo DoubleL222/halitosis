@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+MyBot
+
+# linux build
+Makefile
+cmake_install.cmake
+CMakeFiles
+CMakeCache.txt
+
+#vim
+*.swp
