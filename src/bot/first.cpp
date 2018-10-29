@@ -17,10 +17,12 @@ bool Plan::is_finished() {
     return execution_step >= path.size();
 }
 
-hlt::Direction Plan::next_move() {
-    auto dir = path[execution_step];
+hlt::Direction Plan::next_move() const {
+    return path[execution_step];
+}
+
+void Plan::advance() {
     execution_step++;
-    return dir;
 }
 
 FirstBot::FirstBot(unsigned int seed)
@@ -39,19 +41,33 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
     auto player = frame.get_game().me;
 
     std::vector<hlt::Command> commands;
-    if (game.turn_number == 1) {
+    if (player->halite >= 1000 && !game.game_map->at(player->shipyard)->is_occupied()) {
         commands.push_back(player->shipyard->spawn());
     }
+
+    std::unordered_map<hlt::EntityId, hlt::Direction> moves;
     for (auto& pair: player->ships) {
+        auto id = pair.first;
         auto& ship = pair.second;
+
+        // Create plans if necessary.
         if (plans[ship->id].is_finished()) {
             auto path = frame.get_optimal_path(*ship, player->shipyard->position);
-            plans[ship->id] = Plan(path);
+            plans[id] = Plan(path);
         }
-        commands.push_back(ship->move(plans[ship->id].next_move()));
+        moves[id] = plans[id].next_move();
+    }
+    auto new_moves = frame.avoid_collisions(moves);
 
-        //if (ship->position == player->shipyard->position) {
-        //}
+    // Find moves for each ship, avoiding collisions.
+    for (auto& pair : player->ships) {
+        auto id = pair.first;
+        auto& ship = pair.second;
+
+        if (moves[id] == new_moves[id]) {
+            plans[id].advance();
+        }
+        commands.push_back(ship->move(new_moves[id]));
     }
     return commands;
 }

@@ -153,3 +153,61 @@ Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position e
     }
     return get_search_path(map, search_state, start, end, best_depth);
 }
+
+std::unordered_map<hlt::EntityId, hlt::Direction> Frame::avoid_collisions(
+    std::unordered_map<hlt::EntityId, hlt::Direction>& moves
+) {
+    std::unordered_map<hlt::EntityId, hlt::Direction> new_moves;
+    std::unordered_map<hlt::Position, hlt::EntityId> ship_going_to_position;
+
+    auto player = get_game().me;
+    for (auto& pair : player->ships) {
+        auto id = pair.first;
+        auto& ship = pair.second;
+
+        avoid_collisions_rec(new_moves, ship_going_to_position, id, ship->position, moves[id]);
+    }
+    return new_moves;
+}
+
+void Frame::avoid_collisions_rec(
+    std::unordered_map<hlt::EntityId, hlt::Direction>& current_moves,
+    std::unordered_map<hlt::Position, hlt::EntityId>& ship_going_to_position,
+    hlt::EntityId ship,
+    hlt::Position ship_position,
+    hlt::Direction desired_move
+) {
+    auto new_position = move(ship_position, desired_move);
+    // If another ship already would like to go to the same spot
+    if (ship_going_to_position.count(new_position) == 1) {
+        auto other_ship = ship_going_to_position[new_position];
+        auto other_move = current_moves[other_ship];
+        auto other_origin = move(new_position, hlt::invert_direction(other_move));
+
+        bool update_other_ship = false;
+        if (desired_move == hlt::Direction::STILL) { update_other_ship = true; }
+        if (!update_other_ship) {
+            auto own_sea_halite = get_game().game_map->at(ship_position)->halite;
+            auto other_sea_halite = get_game().game_map->at(other_origin)->halite;
+            update_other_ship = (own_sea_halite < other_sea_halite);
+        }
+        auto updated_ship = ship;
+        auto updated_position = ship_position;
+        if (update_other_ship) {
+            current_moves[ship] = desired_move;
+            ship_going_to_position[new_position] = ship;
+            updated_ship = other_ship;
+            updated_position = other_origin;
+        }
+        avoid_collisions_rec(
+            current_moves,
+            ship_going_to_position,
+            updated_ship,
+            updated_position,
+            hlt::Direction::STILL);
+    } else {
+        current_moves[ship] = desired_move;
+        ship_going_to_position[new_position] = ship;
+    }
+}
+
