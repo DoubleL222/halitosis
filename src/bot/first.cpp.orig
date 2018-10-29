@@ -65,9 +65,16 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
             auto path = frame.get_optimal_path(*ship, player->shipyard->position);
             plans[id] = Plan(path);
         }
+<<<<<<< HEAD
+        commands.push_back(ship->move(plans[ship->id].next_move()));
+
+
+
+        //if (ship->position == player->shipyard->position) {
+        //}
+=======
         moves[id] = plans[id].next_move();
-
-
+>>>>>>> 1fe0163ac17410fd0c9dfc1b25690838542327d2
     }
     auto new_moves = frame.avoid_collisions(moves);
 
@@ -79,10 +86,8 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
         if (moves[id] == new_moves[id]) {
             plans[id].advance();
         }
-        commands.push_back(ship->move(new_moves[id]));
-    }
-    return commands;
-}
+<<<<<<< HEAD
+*/
 
 GameClone::GameClone(const hlt::Game & game)
 {
@@ -109,4 +114,9 @@ void GameClone::advance_game(Plan & plan, hlt::Ship & ship, Frame & frame)
 			ship_cell->ship = nullptr;
 		}
 	}
+=======
+        commands.push_back(ship->move(new_moves[id]));
+    }
+    return commands;
+>>>>>>> 1fe0163ac17410fd0c9dfc1b25690838542327d2
 }

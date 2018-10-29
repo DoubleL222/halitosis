@@ -17,7 +17,8 @@ struct Plan {
 
     bool is_finished();
 
-    hlt::Direction next_move();
+    hlt::Direction next_move() const;
+    void advance();
 };
 
 struct GameClone 
