@@ -23,6 +23,12 @@ hlt::Direction Plan::next_move() {
     return dir;
 }
 
+hlt::Game FirstBot::advance_game(hlt::Game& game, std::vector<hlt::Command> moves)
+{
+	
+	return hlt::Game();
+}
+
 FirstBot::FirstBot(unsigned int seed)
     : rng(seed)
 {
@@ -35,6 +41,10 @@ void FirstBot::init(hlt::Game& game) {
 
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
     Frame frame(game);
+	//Make game clone
+	GameClone game_clone = GameClone(game);
+	//Advance game state from remaining plans
+	//game_clone.advance_game()
 
     auto player = frame.get_game().me;
 
@@ -49,6 +59,8 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
             plans[ship->id] = Plan(path);
         }
         commands.push_back(ship->move(plans[ship->id].next_move()));
+
+
 
         //if (ship->position == player->shipyard->position) {
         //}
@@ -79,3 +91,30 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
             command_queue.push_back(me->shipyard->spawn());
         }
 */
+
+GameClone::GameClone(const hlt::Game & game)
+{
+	this->map = hlt::GameMap(*game.game_map);
+}
+
+void GameClone::advance_game(Plan & plan, hlt::Ship & ship, Frame & frame)
+{
+	for (int i = 0; i<plan.path.size; i++)
+	{
+		hlt::MapCell * ship_cell = map.at(ship);
+
+		if (plan.path[i] == hlt::Direction::STILL)
+		{
+			//Mine The Cell
+			ship_cell->halite = ship_cell->halite * 0.75f;
+		}
+		else 
+		{
+			hlt::Position next_pos = frame.move(ship.position, plan.path[i]);
+			ship_cell->is_empty = true;
+			hlt::MapCell * next_cell = map.at(next_pos);
+			next_cell->ship = ship_cell->ship;
+			ship_cell->ship = nullptr;
+		}
+	}
+}

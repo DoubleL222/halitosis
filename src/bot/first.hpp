@@ -20,10 +20,21 @@ struct Plan {
     hlt::Direction next_move();
 };
 
+struct GameClone 
+{
+	GameClone(const hlt::Game & game);
+
+	hlt::GameMap map;
+
+	void advance_game(Plan & plan, hlt::Ship & ship, Frame & frame);
+};
+
 class FirstBot : public Bot {
     std::mt19937 rng;
 
     std::unordered_map<hlt::EntityId, Plan> plans;
+
+	hlt::Game advance_game(hlt::Game& game, std::vector<hlt::Command> moves);
 
 public:
     FirstBot(unsigned int seed);
