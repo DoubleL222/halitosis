@@ -91,7 +91,7 @@ GameClone::GameClone(const hlt::Game & game)
 
 void GameClone::advance_game(Plan & plan, hlt::Ship & ship, Frame & frame)
 {
-	for (int i = 0; i<plan.path.size; i++)
+	for (int i = plan.execution_step; i<plan.path.size(); i++)
 	{
 		hlt::MapCell * ship_cell = map.at(ship);
 
@@ -103,7 +103,6 @@ void GameClone::advance_game(Plan & plan, hlt::Ship & ship, Frame & frame)
 		else 
 		{
 			hlt::Position next_pos = frame.move(ship.position, plan.path[i]);
-			ship_cell->is_empty = true;
 			hlt::MapCell * next_cell = map.at(next_pos);
 			next_cell->ship = ship_cell->ship;
 			ship_cell->ship = nullptr;
