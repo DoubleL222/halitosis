@@ -55,6 +55,13 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
         commands.push_back(player->shipyard->spawn());
     }
 
+	//Updating clone map
+	for (auto& pair : player->ships) {
+		auto id = pair.first;
+		auto& ship = pair.second;
+		game_clone.advance_game(plans[ship->id], *ship, frame);
+	}
+
     std::unordered_map<hlt::EntityId, hlt::Direction> moves;
     for (auto& pair: player->ships) {
         auto id = pair.first;
@@ -62,12 +69,17 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
 
         // Create plans if necessary.
         if (plans[ship->id].is_finished()) {
-            auto path = frame.get_optimal_path(*ship, player->shipyard->position);
-            plans[id] = Plan(path);
+            //auto path = frame.get_optimal_path(*ship, player->shipyard->position);
+            
+			//Make path on the map clone
+			auto path = frame.get_optimal_path(game_clone.map, *ship, player->shipyard->position);
+
+			plans[id] = Plan(path);
+
+			//Update clone map with current plan
+			game_clone.advance_game(plans[id], *ship, frame);
         }
         moves[id] = plans[id].next_move();
-
-
     }
     auto new_moves = frame.avoid_collisions(moves);
 
