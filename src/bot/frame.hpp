@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "hlt/direction.hpp"
 #include "hlt/game.hpp"
@@ -28,6 +28,7 @@ public:
     std::unordered_map<hlt::EntityId, hlt::Direction> avoid_collisions(
         std::unordered_map<hlt::EntityId, hlt::Direction>& moves
     );
+
 
 private:
     // Attempt to make a ship move a specific way. As long as this leads to a collision, a ship

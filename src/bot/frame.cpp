@@ -168,7 +168,17 @@ struct AStarNode {
 
 	AStarNode(hlt::Position pos) : node_position(pos)
 	{};
+
+	bool operator ==(const AStarNode& a)
+	{
+		return node_position == a.node_position;
+	}
 };
+
+bool operator ==(const AStarNode &a, const AStarNode &b)
+{
+	return a.node_position == b.node_position;
+}
 
 Path Frame::get_a_star_path(hlt::GameMap & map, hlt::Position from, hlt::Position end)
 {
@@ -188,7 +198,16 @@ Path Frame::get_a_star_path(hlt::GameMap & map, hlt::Position from, hlt::Positio
 		//Take from the open list the node node_current with the lowest f(node_current) = g(node_current) + h(node_current)
 		float lowest_f = std::numeric_limits<float>::max();
 		AStarNode * lowest_node = nullptr;
-		for (AStarNode node : open_list) 
+		for (int i = 0; i< open_list.size(); i++)
+		{
+			float current_f = open_list[i].g_val + open_list[i].h_val;
+			if (current_f < lowest_f)
+			{
+				lowest_f = current_f;
+				lowest_node = &open_list[i];
+			}
+		}
+		/*for (AStarNode node : open_list) 
 		{
 			float current_f = node.g_val + node.h_val;
 			if (current_f < lowest_f) 
@@ -196,7 +215,7 @@ Path Frame::get_a_star_path(hlt::GameMap & map, hlt::Position from, hlt::Positio
 				lowest_f = current_f;
 				lowest_node = &node;
 			}
-		}
+		}*/
 		current_node = lowest_node;
 
 		if (current_node->node_position == end_node->node_position) 
@@ -277,6 +296,8 @@ Path Frame::get_a_star_path(hlt::GameMap & map, hlt::Position from, hlt::Positio
 			selected_neighbour_node->parent = current_node;
 		}
 		closed_list.push_back(*current_node);
+		//vec.erase(std::remove(vec.begin(), vec.end(), 8), vec.end());
+		open_list.erase(std::remove(open_list.begin(), open_list.end(), current_node), open_list.end());
 
 		//TODO remove node from open
 		//if(open)
