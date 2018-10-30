@@ -51,7 +51,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
     auto player = frame.get_game().me;
 
     std::vector<hlt::Command> commands;
-    if (player->halite >= 1000 && !game.game_map->at(player->shipyard)->is_occupied()) {
+    if (game.turn_number / hlt::constants::MAX_TURNS < 0.6 && player->halite >= 1000 && !game.game_map->at(player->shipyard)->is_occupied()) {
         commands.push_back(player->shipyard->spawn());
     }
 
