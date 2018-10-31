@@ -16,7 +16,9 @@ ENDIF()
 
 
 include_directories(${CMAKE_SOURCE_DIR}/hlt)
+source_group(hlt ${CMAKE_SOURCE_DIR}/hlt)
 include_directories(${CMAKE_SOURCE_DIR}/bot)
+source_group(bot ${CMAKE_SOURCE_DIR}/bot)
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
 
