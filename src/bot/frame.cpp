@@ -169,16 +169,11 @@ struct AStarNode {
 	AStarNode(hlt::Position pos) : node_position(pos)
 	{};
 
-	bool operator ==(const AStarNode& a)
+	bool operator ==(const AStarNode& a) const
 	{
 		return node_position == a.node_position;
 	}
 };
-
-bool operator ==(const AStarNode &a, const AStarNode &b)
-{
-	return a.node_position == b.node_position;
-}
 
 Path Frame::get_a_star_path(hlt::GameMap & map, hlt::Position from, hlt::Position end)
 {
@@ -297,7 +292,7 @@ Path Frame::get_a_star_path(hlt::GameMap & map, hlt::Position from, hlt::Positio
 		}
 		closed_list.push_back(*current_node);
 		//vec.erase(std::remove(vec.begin(), vec.end(), 8), vec.end());
-		open_list.erase(std::remove(open_list.begin(), open_list.end(), current_node), open_list.end());
+		open_list.erase(std::remove(open_list.begin(), open_list.end(), *current_node), open_list.end());
 
 		//TODO remove node from open
 		//if(open)
