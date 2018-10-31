@@ -178,10 +178,12 @@ struct AStarNode {
 Path Frame::get_a_star_path(hlt::GameMap & map, hlt::Position from, hlt::Position end)
 {
 	// Put node_start in the OPEN list 
+	//WARNING -> SHOULD NEVER POINT TO VECTOR ELEMENTS
 	AStarNode* current_node = new AStarNode(from);
 	current_node->h_val = map.calculate_distance(from, end);
 	current_node->g_val = 0;
 	current_node->movement_penalty = 0;
+	//WARNING -> SHOULD NEVER POINT TO VECTOR ELEMENTS
 	AStarNode* end_node = new AStarNode(end);
 
 	std::vector<AStarNode> open_list;
@@ -192,6 +194,8 @@ Path Frame::get_a_star_path(hlt::GameMap & map, hlt::Position from, hlt::Positio
 	{
 		//Take from the open list the node node_current with the lowest f(node_current) = g(node_current) + h(node_current)
 		float lowest_f = std::numeric_limits<float>::max();
+
+		//WARNING -> SHOULD NEVER POINT TO VECTOR ELEMENTS
 		AStarNode * lowest_node = nullptr;
 		for (int i = 0; i< open_list.size(); i++)
 		{
