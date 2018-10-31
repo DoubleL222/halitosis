@@ -211,3 +211,31 @@ void Frame::avoid_collisions_rec(
     }
 }
 
+std::vector<hlt::MapCell*> Frame::get_cells_within_radius(const hlt::Position& center, const int radius, const Frame::DistanceMeasure distanceMeasure) {
+	int rr = radius * radius, dx, dy;
+	std::vector<hlt::MapCell*> cells;
+	cells.reserve(rr);
+
+	for (int xx = center.x - radius; xx <= center.x + radius; ++xx)
+		for (int yy = center.y - radius; yy <= center.y + radius; ++yy)
+		{
+			dx = center.x - xx;
+			dy = center.y - yy;
+
+			switch (distanceMeasure) {
+			case Frame::DistanceMeasure::EUCLIDEAN:
+				if ((dx * dx + dy * dy) < rr)
+					cells.push_back(game.game_map->at(hlt::Position(xx, yy)));
+				break;
+			case Frame::DistanceMeasure::MANHATTAN:
+				if (std::abs(dx) + std::abs(dy) < radius)
+					cells.push_back(game.game_map->at(hlt::Position(xx, yy)));
+				break;
+			default:
+				hlt::log::log(std::string("Error: get_positions_within_radius: unknown distance measure ") + static_cast<char>(distanceMeasure));
+				exit(1);
+			}
+		}
+	return cells;
+}
+

@@ -3,6 +3,7 @@
 #include "hlt/direction.hpp"
 #include "hlt/game.hpp"
 #include "hlt/position.hpp"
+#include "hlt/map_cell.hpp"
 
 using Path = std::vector<hlt::Direction>;
 
@@ -12,6 +13,11 @@ class Frame {
 
 public:
     Frame(const hlt::Game& game);
+
+	enum class DistanceMeasure : char {
+		EUCLIDEAN = 'e',
+		MANHATTAN = 'm'
+	};
 
     const hlt::Game& get_game() const;
 
@@ -25,6 +31,8 @@ public:
     std::unordered_map<hlt::EntityId, hlt::Direction> avoid_collisions(
         std::unordered_map<hlt::EntityId, hlt::Direction>& moves
     );
+
+	std::vector<hlt::MapCell*> get_cells_within_radius(const hlt::Position& center, const int radius, const DistanceMeasure distanceMeasure = DistanceMeasure::MANHATTAN);
 
 private:
     // Attempt to make a ship move a specific way. As long as this leads to a collision, a ship

@@ -10,10 +10,6 @@ namespace hlt {
         int width;
         int height;
         std::vector<std::vector<MapCell>> cells;
-		enum class DistanceMeasure : char {
-			EUCLIDEAN = 'e',
-			MANHATTAN = 'm'
-		};
 
         MapCell* at(const Position& position) {
             Position normalized = normalize(position);
@@ -89,34 +85,6 @@ namespace hlt {
 
             return Direction::STILL;
         }
-
-		std::vector<MapCell*> get_cells_within_radius(const Position& center, const int radius, const DistanceMeasure distanceMeasure) {
-			int rr = radius * radius, dx, dy;
-			std::vector<MapCell*> cells;
-			cells.reserve(rr);
-
-			for (int xx = center.x - radius; xx <= center.x + radius; ++xx)
-				for (int yy = center.y - radius; yy <= center.y + radius; ++yy)
-				{
-					dx = center.x - xx;
-					dy = center.y - yy;
-
-					switch (distanceMeasure) {
-						case DistanceMeasure::EUCLIDEAN:
-							if ((dx * dx + dy * dy) < rr)
-								cells.push_back(at(Position(xx, yy)));
-							break;
-						case DistanceMeasure::MANHATTAN:
-							if (std::abs(dx) + std::abs(dy) < radius)
-								cells.push_back(at(Position(xx, yy)));
-							break;
-						default:
-							log::log(std::string("Error: get_positions_within_radius: unknown distance measure ") + static_cast<char>(distanceMeasure));
-							exit(1);
-					}
-				}
-			return cells;
-		}
 
         void _update();
         static std::unique_ptr<GameMap> _generate();
