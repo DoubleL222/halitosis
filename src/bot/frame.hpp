@@ -34,6 +34,8 @@ public:
 
 	std::vector<hlt::MapCell*> get_cells_within_radius(const hlt::Position& center, const int radius, const DistanceMeasure distanceMeasure = DistanceMeasure::MANHATTAN);
 
+	int get_total_halite_in_cells_within_radius(const hlt::Position& center, const int radius, const DistanceMeasure distanceMeasure = DistanceMeasure::MANHATTAN);
+
 private:
     // Attempt to make a ship move a specific way. As long as this leads to a collision, a ship
     // will be selected to stand still instead.

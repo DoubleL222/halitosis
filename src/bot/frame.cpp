@@ -239,3 +239,11 @@ std::vector<hlt::MapCell*> Frame::get_cells_within_radius(const hlt::Position& c
 	return cells;
 }
 
+int Frame::get_total_halite_in_cells_within_radius(const hlt::Position& center, const int radius, const Frame::DistanceMeasure distanceMeasure) {
+	std::vector<hlt::MapCell*> cells = get_cells_within_radius(center, radius, distanceMeasure);
+	int total = 0;
+	for (hlt::MapCell* cell : cells) {
+		total += cell->halite;
+	}
+	return total;
+}
