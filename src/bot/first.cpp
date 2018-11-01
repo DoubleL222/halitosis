@@ -49,6 +49,12 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
 	//Advance game state from remaining plans
 	//game_clone.advance_game()
 
+
+
+	//GamePrediction game_prediction(frame, plans, 50);
+
+	//hlt::log::log(game_prediction.print_prediction());
+
     auto player = frame.get_game().me;
 
     std::vector<hlt::Command> commands;

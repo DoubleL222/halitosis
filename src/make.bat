@@ -49,3 +49,4 @@ cl.exe /FeMyBot.exe /std:c++14 /O2 /MT /EHsc /I . /Fo.\obj\ ^
  .\MyBot.cpp ^
  .\bot\frame.cpp ^
  .\bot\first.cpp ^
+ .\bot\game_prediction.cpp ^
