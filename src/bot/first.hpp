@@ -21,15 +21,6 @@ struct Plan {
     void advance();
 };
 
-struct GameClone 
-{
-	GameClone(const hlt::Game & game);
-
-	hlt::GameMap map;
-
-	void advance_game(Plan & plan, hlt::Ship & ship, Frame & frame);
-};
-
 class FirstBot : public Bot {
     std::mt19937 rng;
 

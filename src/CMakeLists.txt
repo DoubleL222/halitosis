@@ -6,10 +6,19 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -Wall -Wno-unused-function -pedantic")
+IF (WIN32)
+  # set stuff for windows
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -Wall -pedantic")
+ELSE()
+  # set stuff for other systems
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -Wall -Wno-unused-function -pedantic")
+ENDIF()
+
 
 include_directories(${CMAKE_SOURCE_DIR}/hlt)
+source_group(hlt ${CMAKE_SOURCE_DIR}/hlt)
 include_directories(${CMAKE_SOURCE_DIR}/bot)
+source_group(bot ${CMAKE_SOURCE_DIR}/bot)
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
 
