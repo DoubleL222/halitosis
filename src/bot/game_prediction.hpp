@@ -12,6 +12,8 @@
 class GamePrediction
 {
 	std::unique_ptr<int[]> prediction_map;
+	int get_index_from_cell(hlt::Position map_position, hlt::GameMap & map, int prediction_step);
+
 public:
 	GamePrediction(const hlt::Game & game, std::unordered_map<hlt::EntityId, Plan> plans, int prediction_steps);
 };
