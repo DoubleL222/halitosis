@@ -30,6 +30,6 @@ struct GameClone
 
 	hlt::GameMap map;
 
-	void advance_game(Plan & plan, hlt::Ship & ship, Frame & frame);
-	void advance_game_by_step(hlt::Direction dir, hlt::Ship & ship, Frame & frame);
+	std::vector<hlt::Position> advance_game(Plan & plan, hlt::Ship & ship, Frame & frame);
+	hlt::Position advance_game_by_step(hlt::Direction dir, hlt::Position current_position, Frame & frame);
 };
