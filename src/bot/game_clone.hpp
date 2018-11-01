@@ -23,7 +23,7 @@ private:
 	int get_index_from_cell(hlt::Position map_position, int prediction_step);
 
 public:
-	hlt::GameMap get_map();
+	hlt::GameMap& get_map();
 	// use this to check if cell will be occupied
 	// prediction_step is how many turns in the future we're looking in ( 0 = current turn)
 	bool is_cell_occupied(int x, int y, int prediction_step);
