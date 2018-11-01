@@ -1,6 +1,6 @@
 #include "bot/first.hpp"
 #include "bot/frame.hpp"
-#include "bot/game_prediction.hpp"
+#include "bot/game_clone.hpp"
 
 Plan::Plan()
   : path(Path()),
@@ -45,11 +45,7 @@ void FirstBot::init(hlt::Game& game) {
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
     Frame frame(game);
 	//Make game clone
-	GameClone game_clone = GameClone(game);
-
-	GamePrediction game_prediction(frame, plans, 50);
-
-	hlt::log::log(game_prediction.print_prediction());
+	GameClone game_clone(&frame, true, 50);
 
     auto player = frame.get_game().me;
 
@@ -62,7 +58,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
 	for (auto& pair : player->ships) {
 		auto id = pair.first;
 		auto& ship = pair.second;
-		game_clone.advance_game(plans[ship->id], *ship, frame);
+		game_clone.advance_game(plans[ship->id], *ship);
 	}
 
     std::unordered_map<hlt::EntityId, hlt::Direction> moves;
@@ -75,12 +71,12 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
             //auto path = frame.get_optimal_path(*ship, player->shipyard->position);
             
 			//Make path on the map clone
-			auto path = frame.get_optimal_path(game_clone.map, *ship, player->shipyard->position);
+			auto path = frame.get_optimal_path(game_clone.get_map(), *ship, player->shipyard->position);
 
 			plans[id] = Plan(path);
 
 			//Update clone map with current plan
-			game_clone.advance_game(plans[id], *ship, frame);
+			game_clone.advance_game(plans[id], *ship);
         }
         moves[id] = plans[id].next_move();
     }
@@ -96,5 +92,9 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
         }
         commands.push_back(ship->move(new_moves[id]));
     }
+
+	//Print prediction
+	hlt::log::log(game_clone.print_prediction());
+
     return commands;
 }
