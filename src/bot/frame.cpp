@@ -154,6 +154,10 @@ Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position e
     return get_search_path(map, search_state, start, end, best_depth);
 }
 
+int Frame::get_index(hlt::Position position) {
+    return position.y*game.game_map->width+position.x;
+}
+
 std::unordered_map<hlt::EntityId, hlt::Direction> Frame::avoid_collisions(
     std::unordered_map<hlt::EntityId, hlt::Direction>& moves
 ) {

@@ -27,6 +27,9 @@ public:
     );
 
 private:
+    // Converts a position to an index in the grid when stored as a row-order matrix.
+    int get_index(hlt::Position pos) const;
+
     // Attempt to make a ship move a specific way. As long as this leads to a collision, a ship
     // will be selected to stand still instead.
     void avoid_collisions_rec(
