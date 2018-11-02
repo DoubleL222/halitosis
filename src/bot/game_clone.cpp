@@ -21,27 +21,22 @@ bool GameClone::is_cell_occupied(hlt::Position map_position, int prediction_step
 	return prediction_map[index];
 }
 
-GameClone::GameClone(Frame * frame)
+GameClone::GameClone(Frame & frame) : frame(frame)
 {
-	this->map = hlt::GameMap(*frame->get_game().game_map);
-	this->frame = frame;
+	this->map = hlt::GameMap(*frame.get_game().game_map);
+//	this->frame = frame;
 	this->do_prediction = false;
 }
 
-GameClone::GameClone(hlt::GameMap * game_map)
+GameClone::GameClone(Frame& frame, bool do_prediction, int prediction_steps) : frame(frame)
 {
-
-}
-
-GameClone::GameClone(Frame * frame, bool do_prediction, int prediction_steps)
-{
-	this->map = hlt::GameMap(*frame->get_game().game_map);
-	this->frame = frame;
+	this->map = hlt::GameMap(*frame.get_game().game_map);
+	//this->frame = frame;
 	this->do_prediction = do_prediction;
 	this->prediction_steps = prediction_steps;
 	if (do_prediction) 
 	{
-		prediction_map = std::make_unique<int[]>((size_t)(frame->get_game().game_map->height * frame->get_game().game_map->width * prediction_steps));
+		prediction_map = std::make_unique<int[]>((size_t)(frame.get_game().game_map->height * frame.get_game().game_map->width * prediction_steps));
 		//Make clone of current game state
 		//GameClone game_clone = GameClone(frame->get_game());
 
@@ -102,7 +97,7 @@ hlt::Position GameClone::advance_game_by_step(hlt::Direction dir, hlt::Position 
 	else
 	{
 		//move
-		hlt::Position next_pos = frame->move(current_position, dir);
+		hlt::Position next_pos = frame.move(current_position, dir);
 		next_cell = map.at(next_pos);
 		next_cell->ship = ship_cell->ship;
 		ship_cell->ship = nullptr;

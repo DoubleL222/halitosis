@@ -45,7 +45,7 @@ void FirstBot::init(hlt::Game& game) {
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
     Frame frame(game);
 	//Make game clone
-	GameClone game_clone(&frame, true, 50);
+	GameClone game_clone(frame, true, 50);
 
     auto player = frame.get_game().me;
 
@@ -78,15 +78,17 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
 		if ((float)(game.turn_number) / (float)(hlt::constants::MAX_TURNS) > 0.95f) {
 			hlt::log::log("ENTERING STATE: returning");
 			current_bot_state = bot_state::returning;
+		}
+	}
+	if (current_bot_state == bot_state::returning) 
+	{
+		for (auto& pair : player->ships) {
+			auto id = pair.first;
+			auto& ship = pair.second;
 
-			for (auto& pair : player->ships) {
-				auto id = pair.first;
-				auto& ship = pair.second;
-
-				//TODO get closest deploy position
-				auto path = frame.get_direct_path(game_clone.get_map(), *ship, player->shipyard->position);
-				plans[id] = Plan(path);
-			}
+			//TODO get closest deploy position
+			auto path = frame.get_direct_path(game_clone.get_map(), *ship, player->shipyard->position);
+			plans[id] = Plan(path);
 		}
 	}
 
