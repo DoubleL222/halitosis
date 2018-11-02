@@ -53,7 +53,6 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
 
 	//Updating clone map
 	for (auto& pair : player->ships) {
-		auto id = pair.first;
 		auto& ship = pair.second;
 		game_clone.advance_game(plans[ship->id], *ship);
 	}
@@ -134,7 +133,6 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
 		//Go straight for shipyard
 		for (auto& pair : player->ships) 
 		{
-			auto id = pair.first;
 			auto& ship = pair.second;
 			if (!plans[ship->id].is_finished())
 			{

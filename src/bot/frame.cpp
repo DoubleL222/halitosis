@@ -126,7 +126,7 @@ Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position e
             }
         }
     }
-    /*
+    
     for (int depth=0; depth<max_depth; depth++) {
         std::cerr << depth << "-------" << std::endl;
         for (int dy=-depth; dy <= depth; dy++) {
@@ -143,7 +143,7 @@ Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position e
             std::cerr << std::endl;
         }
     }
-    */
+   
     float best_halite_per_turn = 0;
     int best_depth = 1;
     for (int depth=1; depth < max_depth; depth++) {
