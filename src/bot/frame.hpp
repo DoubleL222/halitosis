@@ -27,8 +27,8 @@ public:
     Path get_optimal_path(hlt::Ship& ship, hlt::Position end);
     Path get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);
 
-	//a*
-	Path get_a_star_path(hlt::GameMap& map, hlt::Position start, hlt::Position end);
+	//Direct path
+	Path get_direct_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);
 
     // Update the moves map to avoid collisions between own ships.
     std::unordered_map<hlt::EntityId, hlt::Direction> avoid_collisions(

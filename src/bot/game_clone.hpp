@@ -29,6 +29,7 @@ public:
 	bool is_cell_occupied(int x, int y, int prediction_step);
 	bool is_cell_occupied(hlt::Position map_position, int prediction_step);
 	GameClone(Frame * frame);
+	GameClone(hlt::GameMap * game_map);
 	GameClone(Frame * frame, bool do_prediction, int prediction_steps);
 	std::vector<hlt::Position> advance_game(Plan & plan, hlt::Ship & ship);
 	std::string print_prediction();
