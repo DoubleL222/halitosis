@@ -45,7 +45,7 @@ void FirstBot::init(hlt::Game& game) {
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
     Frame frame(game);
 	//Make game clone
-	GameClone game_clone(&frame, true, 50);
+	GameClone game_clone(&frame, true, 100);
 
     auto player = frame.get_game().me;
 
