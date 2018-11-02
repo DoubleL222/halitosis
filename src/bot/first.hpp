@@ -28,6 +28,9 @@ class FirstBot : public Bot {
 
 	hlt::Game advance_game(hlt::Game& game, std::vector<hlt::Command> moves);
 
+	enum bot_state {building_and_gathering, hoarding_and_gathering, returning};
+
+	bot_state current_bot_state;
 public:
     FirstBot(unsigned int seed);
 

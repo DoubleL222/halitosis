@@ -1,4 +1,5 @@
 ﻿#include "bot/frame.hpp"
+#include "bot/game_clone.hpp"
 
 #include <cmath>
 #include <memory>
@@ -153,6 +154,12 @@ Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position e
         }
     }
     return get_search_path(map, search_state, start, end, best_depth);
+}
+
+Path Frame::get_direct_path(hlt::GameMap & map, hlt::Ship & ship, hlt::Position end)
+{
+	Path unsafe_path = map.get_unsafe_moves(ship.position, end);
+	return unsafe_path;
 }
 
 std::unordered_map<hlt::EntityId, hlt::Direction> Frame::avoid_collisions(

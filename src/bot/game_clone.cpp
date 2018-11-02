@@ -10,7 +10,7 @@ hlt::GameMap GameClone::get_map()
 bool GameClone::is_cell_occupied(int x, int y, int prediction_step)
 {
 	int index = prediction_step * (map.height * map.width) + (y * map.width) + x;
-	return index;
+	return prediction_map[index];
 }
 
 // use this to check if cell will be occupied
@@ -18,7 +18,7 @@ bool GameClone::is_cell_occupied(int x, int y, int prediction_step)
 bool GameClone::is_cell_occupied(hlt::Position map_position, int prediction_step)
 {
 	int index = prediction_step * (map.height * map.width) + (map_position.y * map.width) + map_position.x;
-	return index;
+	return prediction_map[index];
 }
 
 GameClone::GameClone(Frame * frame)
@@ -26,6 +26,11 @@ GameClone::GameClone(Frame * frame)
 	this->map = hlt::GameMap(*frame->get_game().game_map);
 	this->frame = frame;
 	this->do_prediction = false;
+}
+
+GameClone::GameClone(hlt::GameMap * game_map)
+{
+
 }
 
 GameClone::GameClone(Frame * frame, bool do_prediction, int prediction_steps)
