@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <limits>
+#include <queue>
 
 Frame::Frame(const hlt::Game& game) : game(game) {}
 
@@ -156,70 +157,194 @@ Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position e
     return get_search_path(map, search_state, start, end, best_depth);
 }
 
-Path Frame::get_direct_path(hlt::GameMap & map, hlt::Ship & ship, hlt::Position end)
-{
+int Frame::get_index(hlt::Position position) const {
+    return position.y*game.game_map->width+position.x;
+}
+
+Path Frame::get_direct_path(hlt::GameMap & map, hlt::Ship & ship, hlt::Position end) {
 	Path unsafe_path = map.get_unsafe_moves(ship.position, end);
 	return unsafe_path;
+}
+
+unsigned int Frame::get_board_size() const {
+    return game.game_map->width*game.game_map->height;
+}
+
+struct Edge {
+    unsigned int from;
+    unsigned int to;
+    bool full;
+    bool priority;
+
+    Edge(unsigned int from, unsigned int to, bool priority)
+      : from(from),
+        to(to),
+        full(false),
+        priority(priority)
+    {
+    }
+
+    // The neighbor to a specific node when traversing this edge.
+    int neighbor(unsigned int current_node) const {
+        return current_node == to ? from : to;
+    }
+
+    // Whether the edge can be traversed from the specified node.
+    bool is_traversable(unsigned int current_node, bool priority_only) const {
+        return (priority || !priority_only) && (current_node == from ? !full : full);
+    }
+
+    // Send 1 unit of flow through this edge.
+    void flow() {
+        full = !full;
+    }
+};
+
+std::ostream& operator<<(std::ostream& os, const Edge& self) {
+    os << "Edge { from: " << self.from << ", to: " << self.to << ", full: " << self.full << ", priority: " << self.priority << " }";
+    return os;
+}
+
+struct FlowGraph {
+    std::vector<Edge> edges;
+    std::vector<std::vector<int>> nodes;
+    std::vector<int> last_visit;
+    std::vector<int> from_edge;
+    int current_depth = 0;
+
+    void finalize(int size) {
+        nodes = std::vector<std::vector<int>>(size);
+        last_visit = std::vector<int>(size);
+        from_edge = std::vector<int>(size);
+
+        for (int i=0; i<size; i++) {
+            last_visit[i] = -1;
+        }
+        for (size_t i=0; i<edges.size(); i++) {
+            nodes[edges[i].from].push_back(i);
+            nodes[edges[i].to].push_back(i);
+        }
+    }
+
+    bool augment(bool priority_only) {
+        current_depth++;
+
+        std::queue<int> queue;
+        queue.push(0);
+        last_visit[0] = current_depth;
+        while (!queue.empty()) {
+            int front = queue.front();
+            queue.pop();
+            // Stop if destination is reached.
+            if (front == 1) { break; }
+
+            for (auto edge_idx : nodes[front]) {
+                if (edges[edge_idx].is_traversable(front, priority_only)) {
+                    int neighbor = edges[edge_idx].neighbor(front);
+                    if (last_visit[neighbor] != current_depth) {
+                        last_visit[neighbor] = current_depth;
+                        from_edge[neighbor] = edge_idx;
+                        queue.push(neighbor);
+                    }
+                }
+            }
+        }
+        if (last_visit[1] != current_depth) {
+            // No augmentation path found
+            return false;
+        }
+        int back_node = 1;
+        while (back_node != 0) {
+            auto& edge = edges[from_edge[back_node]];
+            edge.flow();
+            back_node = edge.neighbor(back_node);
+        }
+        return true;
+    }
+};
+
+std::ostream& operator<<(std::ostream& os, const FlowGraph& graph) {
+    for (size_t i=0; i<graph.nodes.size(); i++) {
+        int relevant_neighbors = 0;
+        for (auto edge_idx: graph.nodes[i]) {
+            int neighbor = graph.edges[edge_idx].neighbor(i);
+            if (graph.nodes[neighbor].size() >= 2) {
+                relevant_neighbors++;
+            }
+        }
+
+        if (relevant_neighbors >= 2 || i == 0) {
+            os << i << ": ";
+            for (auto edge_idx: graph.nodes[i]) {
+                int neighbor = graph.edges[edge_idx].neighbor(i);
+                if (graph.nodes[neighbor].size() >= 2) {
+                    os << graph.edges[edge_idx] << " ";
+                }
+            }
+            os << std::endl;
+        }
+    }
+    return os;
 }
 
 std::unordered_map<hlt::EntityId, hlt::Direction> Frame::avoid_collisions(
     std::unordered_map<hlt::EntityId, hlt::Direction>& moves
 ) {
-    std::unordered_map<hlt::EntityId, hlt::Direction> new_moves;
-    std::unordered_map<hlt::Position, hlt::EntityId> ship_going_to_position;
-
-    auto player = get_game().me;
-    for (auto& pair : player->ships) {
-        auto id = pair.first;
-        auto& ship = pair.second;
-
-        avoid_collisions_rec(new_moves, ship_going_to_position, id, ship->position, moves[id]);
+    // Reduce to flow problem.
+    // There are nodes for each ship, each cell + source, sink.
+    // The source is connected to each ship with capacity 1.
+    // Each ship is connected to each cell it can go to with capacity 1.
+    // Each cell is connected to the sink with capacity 1.
+    // The returned moves are those where a path between the ships and cells have been used.
+    //
+    // To get as many prefered paths as possible, first find max flow using only desired moves,
+    // then augment the solution using bfs with all edges.
+    FlowGraph graph;
+    std::vector<std::shared_ptr<hlt::Ship>> ships;
+    for (auto pair : game.me->ships) {
+        ships.push_back(pair.second);
     }
-    return new_moves;
-}
 
-void Frame::avoid_collisions_rec(
-    std::unordered_map<hlt::EntityId, hlt::Direction>& current_moves,
-    std::unordered_map<hlt::Position, hlt::EntityId>& ship_going_to_position,
-    hlt::EntityId ship,
-    hlt::Position ship_position,
-    hlt::Direction desired_move
-) {
-    auto new_position = move(ship_position, desired_move);
-    // If another ship already would like to go to the same spot
-    if (ship_going_to_position.count(new_position) == 1) {
-        auto other_ship = ship_going_to_position[new_position];
-        auto other_move = current_moves[other_ship];
-        auto other_origin = move(new_position, hlt::invert_direction(other_move));
-
-        bool update_other_ship = false;
-        if (desired_move == hlt::Direction::STILL) { update_other_ship = true; }
-        if (!update_other_ship) {
-            auto own_sea_halite = get_game().game_map->at(ship_position)->halite;
-            auto other_sea_halite = get_game().game_map->at(other_origin)->halite;
-            update_other_ship = (own_sea_halite < other_sea_halite);
+    // Setup graph
+    // source = 0, sink = 1
+    for (size_t i=0; i<ships.size(); i++) {
+        graph.edges.push_back(Edge(0, 2+i, true));
+        int cell_index = get_index(ships[i]->position);
+        int next_index = get_index(move(ships[i]->position, moves[ships[i]->id]));
+        graph.edges.push_back(Edge(2+i, 2+ships.size()+next_index, true));
+        if (next_index != cell_index) {
+            graph.edges.push_back(Edge(2+i, 2+ships.size()+cell_index, false));
         }
-        auto updated_ship = ship;
-        auto updated_position = ship_position;
-        if (update_other_ship) {
-            current_moves[ship] = desired_move;
-            ship_going_to_position[new_position] = ship;
-            updated_ship = other_ship;
-            updated_position = other_origin;
-        }
-        avoid_collisions_rec(
-            current_moves,
-            ship_going_to_position,
-            updated_ship,
-            updated_position,
-            hlt::Direction::STILL);
-    } else {
-        current_moves[ship] = desired_move;
-        ship_going_to_position[new_position] = ship;
     }
+    for (size_t i=0; i<get_board_size(); i++) {
+        graph.edges.push_back(Edge(2+ships.size()+i, 1, true));
+    }
+    graph.finalize(2+ships.size()+get_board_size());
+
+    // Solve flow using priority edges only.
+    while(graph.augment(true) != 0) { }
+    // Augment using all edges
+    while(graph.augment(false) != 0) { }
+
+    std::unordered_map<hlt::EntityId, hlt::Direction> res;
+    for (size_t i=0; i<ships.size(); i++) {
+        int cell_index = get_index(ships[i]->position);
+
+        hlt::Direction new_move = hlt::Direction::STILL;
+        for (auto& edge_idx : graph.nodes[2+i]) {
+            auto edge = graph.edges[edge_idx];
+            if (edge.from == 2+i && edge.full) {
+                if (edge.to == 2+ships.size()+cell_index) {
+                    new_move = hlt::Direction::STILL;
+                } else {
+                    new_move = moves[ships[i]->id];
+                }
+            }
+        }
+        res[ships[i]->id] = new_move;
+    }
+    return res;
 }
-
-
 
 std::vector<hlt::MapCell*> Frame::get_cells_within_radius(const hlt::Position& center, const int radius, const Frame::DistanceMeasure distanceMeasure) {
 	int rr = radius * radius, dx, dy;

@@ -39,14 +39,10 @@ public:
 
 	int get_total_halite_in_cells_within_radius(const hlt::Position& center, const int radius, const DistanceMeasure distanceMeasure = DistanceMeasure::MANHATTAN);
 
+    // Retrieve the number of cells on the board
+    unsigned int get_board_size() const;
+
 private:
-    // Attempt to make a ship move a specific way. As long as this leads to a collision, a ship
-    // will be selected to stand still instead.
-    void avoid_collisions_rec(
-        std::unordered_map<hlt::EntityId, hlt::Direction>& current_moves,
-        std::unordered_map<hlt::Position, hlt::EntityId>& ship_going_to_position,
-        hlt::EntityId ship,
-        hlt::Position ship_position,
-        hlt::Direction desired_move
-    );
+    // Converts a position to an index in the grid when stored as a row-order matrix.
+    int get_index(hlt::Position pos) const;
 };

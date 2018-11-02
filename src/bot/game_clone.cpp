@@ -1,6 +1,6 @@
 #include "game_clone.hpp"
 
-hlt::GameMap GameClone::get_map()
+hlt::GameMap& GameClone::get_map()
 {
 	return map;
 }
