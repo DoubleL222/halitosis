@@ -99,8 +99,8 @@ hlt::Position GameClone::advance_game_by_step(hlt::Direction dir, hlt::Position 
 		//move
 		hlt::Position next_pos = frame.move(current_position, dir);
 		next_cell = map.at(next_pos);
-		next_cell->ship = ship_cell->ship;
-		ship_cell->ship = nullptr;
+		//next_cell->ship = ship_cell->ship;
+		//ship_cell->ship = nullptr;
 
 		return next_cell->position;
 	}
