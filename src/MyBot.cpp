@@ -2,6 +2,7 @@
 #include "hlt/game.hpp"
 #include "hlt/log.hpp"
 
+#include <chrono>
 #include <ctime>
 #include <string>
 
@@ -21,7 +22,9 @@ int main(int argc, char* argv[]) {
 
     for (;;) {
         game.update_frame();
-        auto commands = bot.run(game);
+        auto now = ms_clock::now();
+        auto turn_end = now+std::chrono::milliseconds(1000);
+        auto commands = bot.run(game, turn_end);
         if (!game.end_turn(commands)) {
             break;
         }

@@ -41,5 +41,5 @@ public:
 
     void init(hlt::Game& game);
 
-    std::vector<hlt::Command> run(const hlt::Game& game);
+    std::vector<hlt::Command> run(const hlt::Game& game, time_point end_time);
 };

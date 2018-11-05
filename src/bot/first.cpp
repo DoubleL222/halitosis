@@ -42,10 +42,13 @@ void FirstBot::init(hlt::Game& game) {
     game.ready("FirstBot");
 }
 
-std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
+// Max depth used by get_optimal_path
+const size_t MAX_SEARCH_DEPTH = 200;
+
+std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_time) {
     Frame frame(game);
 	//Make game clone
-	GameClone game_clone(frame, true, std::max(game.game_map->width, game.game_map->height));
+	GameClone game_clone(frame, true, MAX_SEARCH_DEPTH);
 
     auto player = frame.get_game().me;
 
@@ -94,16 +97,29 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
 	//TODO make direct path to closeset deploy station when returning
     std::unordered_map<hlt::EntityId, hlt::Direction> moves;
 	if (current_bot_state != bot_state::returning) {
+        int num_finished_plans = 0;
+        for (auto& pair : player->ships) {
+            if (plans[pair.first].is_finished()) { num_finished_plans++; }
+        }
+        auto time_budget = end_time-ms_clock::now();
+            //std::chrono::duration_cast<std::chrono::milliseconds>();
+        auto time_per_plan = time_budget;
+        if (num_finished_plans != 0) { time_per_plan /= num_finished_plans; }
+
 		for (auto& pair : player->ships) {
 			auto id = pair.first;
 			auto& ship = pair.second;
 
 			// Create plans if necessary.
 			if (plans[ship->id].is_finished()) {
-				//auto path = frame.get_optimal_path(*ship, player->shipyard->position);
-
+                auto now = ms_clock::now();
 				//Make path on the map clone
-				auto path = frame.get_optimal_path(game_clone.get_map(), *ship, player->shipyard->position);
+				auto path = frame.get_optimal_path(
+                    game_clone.get_map(),
+                    *ship,
+                    player->shipyard->position,
+                    now+time_per_plan,
+                    MAX_SEARCH_DEPTH);
 
 				plans[id] = Plan(path);
 

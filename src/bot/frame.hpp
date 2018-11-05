@@ -4,6 +4,7 @@
 #include "hlt/game.hpp"
 #include "hlt/position.hpp"
 #include "hlt/map_cell.hpp"
+#include "bot/typedefs.hpp"
 
 using Path = std::vector<hlt::Direction>;
 
@@ -24,8 +25,9 @@ public:
     hlt::Position move(hlt::Position pos, int direction_x, int direction_y);
     hlt::Position move(hlt::Position pos, hlt::Direction direction);
 
-    Path get_optimal_path(hlt::Ship& ship, hlt::Position end);
-    Path get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);
+    Path get_optimal_path(hlt::Ship& ship, hlt::Position end, time_point end_time, size_t max_depth);
+    Path get_optimal_path(
+        hlt::GameMap& map, hlt::Ship& ship, hlt::Position end, time_point end_time, size_t max_depth);
 
 	//Direct path
 	Path get_direct_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);

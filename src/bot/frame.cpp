@@ -34,8 +34,8 @@ int get_depth_index(int depth, hlt::GameMap& map, hlt::Position pos) {
     return depth*board_size+pos.y*map.width+pos.x;
 }
 
-Path Frame::get_optimal_path(hlt::Ship& ship, hlt::Position end) {
-    return get_optimal_path(*game.game_map, ship, end);
+Path Frame::get_optimal_path(hlt::Ship& ship, hlt::Position end, time_point end_time, size_t max_depth) {
+    return get_optimal_path(*game.game_map, ship, end, end_time, max_depth);
 }
 
 struct SearchState {
@@ -64,22 +64,31 @@ Path get_search_path(
 }
 
 // Find an optimal path to a point for a ship on a specific map.
-Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end) {
+Path Frame::get_optimal_path(
+    hlt::GameMap& map,
+    hlt::Ship& ship,
+    hlt::Position end,
+    time_point end_time,
+    size_t max_depth
+) {
     auto start = ship.position;
-    int board_size = map.width*map.height;
-    int max_depth = std::max(map.width, map.height);
-    auto search_state_owned = std::make_unique<SearchState[]>(board_size*max_depth);
+    auto search_state_owned = std::make_unique<SearchState[]>(max_depth*get_board_size());
     auto search_state = search_state_owned.get();
 
     int start_idx = get_depth_index(0, map, start);
     search_state[start_idx].halite = ship.halite;
     search_state[start_idx].visited = true;
     search_state[start_idx].board_override = std::unordered_map<hlt::Position, hlt::Halite>();
-    for (int depth=0; depth < max_depth-1; depth++) {
-        for (int dy=-depth; dy <= depth; dy++) {
-            for (int dx=-depth; dx <= depth; dx++) {
+    unsigned int search_depth = 0;
+    for (
+        auto now = ms_clock::now();
+        search_depth < max_depth && now < end_time;
+        now = ms_clock::now(), search_depth++
+    ) {
+        for (int dy=-search_depth; dy <= static_cast<int>(search_depth); dy++) {
+            for (int dx=-search_depth; dx <= static_cast<int>(search_depth); dx++) {
                 auto pos = move(start, dx, dy);
-                int cur_idx = get_depth_index(depth, map, pos);
+                int cur_idx = get_depth_index(search_depth, map, pos);
                 if (!search_state[cur_idx].visited) { continue; }
 
                 auto current_halite = search_state[cur_idx].halite;
@@ -97,7 +106,7 @@ Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position e
                 // Movement
                 if (halite_after_move >= 0) {
                     for (auto direction : hlt::ALL_CARDINALS) {
-                        int new_idx = get_depth_index(depth+1, map, move(pos, direction));
+                        int new_idx = get_depth_index(search_depth+1, map, move(pos, direction));
                         bool update = !search_state[new_idx].visited
                             || halite_after_move > search_state[new_idx].halite;
                         if (update) {
@@ -110,7 +119,7 @@ Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position e
                     }
                 }
                 // Gathering
-                int new_idx = get_depth_index(depth+1, map, pos);
+                int new_idx = get_depth_index(search_depth+1, map, pos);
                 if (halite_after_gather > search_state[new_idx].halite) {
                     std::unordered_map<hlt::Position, hlt::Halite> new_override(
                         search_state[cur_idx].board_override
@@ -126,28 +135,10 @@ Path Frame::get_optimal_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position e
             }
         }
     }
-    /*
-    for (int depth=0; depth<max_depth; depth++) {
-        std::cerr << depth << "-------" << std::endl;
-        for (int dy=-depth; dy <= depth; dy++) {
-            for (int dx=-depth; dx <= depth; dx++) {
-                auto pos = move(start, dx, dy);
-                int cur_idx = get_depth_index(depth, map, pos);
-                if (search_state[cur_idx].visited) {
-                    std::cerr << search_state[cur_idx].halite << " ";
-                } else {
-                    std::cerr << "X ";
 
-                }
-            }
-            std::cerr << std::endl;
-        }
-    }
-    */
-   
     float best_halite_per_turn = 0;
     int best_depth = 1;
-    for (int depth=1; depth < max_depth; depth++) {
+    for (unsigned int depth=1; depth < search_depth; depth++) {
         int idx = get_depth_index(depth, map, end);
         float halite_per_turn = ((float)(search_state[idx].halite))/depth;
         if (halite_per_turn > best_halite_per_turn) {
