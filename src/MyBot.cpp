@@ -6,7 +6,9 @@
 #include <string>
 
 int main(int argc, char* argv[]) {
-    unsigned int rng_seed = argc > 1
+    
+	//std::cout << "Paramater: " << argv[0] << std::endl;
+	unsigned int rng_seed = argc > 1
         ? static_cast<unsigned int>(std::stoul(argv[1]))
         : std::time(nullptr);
 

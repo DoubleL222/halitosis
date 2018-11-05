@@ -31,6 +31,11 @@ class FirstBot : public Bot {
 	enum bot_state {building_and_gathering, hoarding_and_gathering, returning};
 
 	bot_state current_bot_state;
+
+	//Factors for optimal ship number
+	float factor_halite_left;
+	float factor_turns_left;
+
 public:
     FirstBot(unsigned int seed);
 

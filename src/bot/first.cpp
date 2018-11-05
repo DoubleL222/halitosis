@@ -66,7 +66,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
 		}
 
 		//stop building, start hoarding
-		if ((float)(game.turn_number) / (float)(hlt::constants::MAX_TURNS) > 0.6f) {
+		if ((float)(game.turn_number) / (float)(hlt::constants::MAX_TURNS) > 0.4f) {
 			hlt::log::log("ENTERING STATE: hoarding_and_gathering");
 			current_bot_state = bot_state::hoarding_and_gathering;
 		}
