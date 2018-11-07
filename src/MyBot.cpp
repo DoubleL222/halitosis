@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
     auto bot = FirstBot(rng_seed);
 
 	//for finding optimal ship count
-	bot.set_ship_count_factors(std::atof(argv[1]), std::atof(argv[2]));
+	//bot.set_ship_count_factors(std::atof(argv[1]), std::atof(argv[2]));
 
     bot.init(game);
 
