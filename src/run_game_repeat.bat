@@ -1,3 +1,3 @@
 call make.bat
-halite.exe --replay-directory replays/ -vvv --width 32 --height 32 --results-as-json "MyBot.exe 1" "MyBot.exe 1"
+FOR /L %%A IN (0,1,5) DO (halite.exe --replay-directory replays/ -vvv --width 32 --height 32 --results-as-json "MyBot.exe "%A%" "%A% "MyBot.exe 1 2")
 PAUSE

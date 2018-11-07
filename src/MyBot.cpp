@@ -15,6 +15,10 @@ int main(int argc, char* argv[]) {
     hlt::Game game;
 
     auto bot = FirstBot(rng_seed);
+
+	//for finding optimal ship count
+	bot.set_ship_count_factors(std::atof(argv[1]), std::atof(argv[2]));
+
     bot.init(game);
 
     hlt::log::log("Successfully created bot! My Player ID is " + std::to_string(game.my_id) + ". Bot rng seed is " + std::to_string(rng_seed) + ".");

@@ -167,6 +167,34 @@ Path Frame::get_direct_path(hlt::GameMap & map, hlt::Ship & ship, hlt::Position 
 	return unsafe_path;
 }
 
+int Frame::get_optimal_number_of_ships(float factor_halite_left, float factor_turns_left)
+{
+	return (int)(factor_halite_left * (float)get_halite_left() + factor_turns_left * (float)get_turns_left());
+}
+
+int Frame::get_helite_left_on_map(hlt::GameMap & map)
+{
+	int halite_left = 0.0f;
+	for (std::vector<hlt::MapCell> cell_row : map.cells) 
+	{
+		for (hlt::MapCell cell : cell_row) 
+		{
+			halite_left += cell.halite;
+		}
+	}
+	return halite_left;
+}
+
+int Frame::get_halite_left()
+{
+	return get_helite_left_on_map(*game.game_map);
+}
+
+int Frame::get_turns_left()
+{
+	return hlt::constants::MAX_TURNS - game.turn_number;
+}
+
 unsigned int Frame::get_board_size() const {
     return game.game_map->width*game.game_map->height;
 }

@@ -39,6 +39,15 @@ public:
 
 	int get_total_halite_in_cells_within_radius(const hlt::Position& center, const int radius, const DistanceMeasure distanceMeasure = DistanceMeasure::MANHATTAN);
 
+	//for finding optimal ship count
+	int get_optimal_number_of_ships(float factor_halite_left, float factor_turns_left);
+
+	int get_helite_left_on_map(hlt::GameMap & map);
+
+	int get_halite_left();
+
+	int get_turns_left();
+
     // Retrieve the number of cells on the board
     unsigned int get_board_size() const;
 

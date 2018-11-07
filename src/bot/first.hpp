@@ -41,5 +41,7 @@ public:
 
     void init(hlt::Game& game);
 
+	void set_ship_count_factors(float halite_left, float turns_left);
+
     std::vector<hlt::Command> run(const hlt::Game& game);
 };

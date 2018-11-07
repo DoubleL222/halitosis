@@ -42,6 +42,13 @@ void FirstBot::init(hlt::Game& game) {
     game.ready("FirstBot");
 }
 
+void FirstBot::set_ship_count_factors(float halite_left, float turns_left)
+{
+	hlt::log::log("setting halite left factor to: "+std::to_string(halite_left)+" ; truns left to: "+ std::to_string(turns_left));
+	this->factor_halite_left = halite_left;
+	this->factor_turns_left = turns_left;
+}
+
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game) {
     Frame frame(game);
 	//Make game clone
