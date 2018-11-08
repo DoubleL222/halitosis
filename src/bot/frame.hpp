@@ -6,7 +6,17 @@
 #include "hlt/map_cell.hpp"
 #include "bot/typedefs.hpp"
 
+struct PathSegment {
+    hlt::Direction direction;
+    hlt::Halite halite;
+    hlt::Halite deposited_halite;
+
+    PathSegment();
+    PathSegment(hlt::Direction direction, hlt::Halite halite, hlt::Halite deposited_halite);
+};
+
 using Path = std::vector<hlt::Direction>;
+using SearchPath = std::vector<PathSegment>;
 
 // Strategy used by get_optimal_path to select plan depth.
 enum class PathSelectionStrategy {
@@ -31,7 +41,7 @@ public:
     hlt::Position move(hlt::Position pos, int direction_x, int direction_y);
     hlt::Position move(hlt::Position pos, hlt::Direction direction);
 
-    Path get_optimal_path(
+    SearchPath get_optimal_path(
         hlt::GameMap& map,
         hlt::Ship& ship,
         hlt::Position end,

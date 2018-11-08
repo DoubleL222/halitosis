@@ -63,7 +63,8 @@ std::vector<hlt::Position> GameClone::advance_game(Plan & plan, hlt::Ship & ship
 	int position_iterator = 0;
 	for (size_t i = plan.execution_step; i < plan.path.size(); i++)
 	{
-		all_positions.push_back(advance_game_by_step(plan.path[i], all_positions[position_iterator]));
+		all_positions.push_back(
+            advance_game_by_step(plan.path[i].direction, all_positions[position_iterator]));
 		position_iterator++;
 	}
 

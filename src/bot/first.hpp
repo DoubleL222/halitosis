@@ -9,11 +9,11 @@
 #include <vector>
 
 struct Plan {
-    Path path;
+    SearchPath path;
     unsigned int execution_step;
 
     Plan();
-    Plan(Path path);
+    Plan(SearchPath path);
 
     bool is_finished();
 

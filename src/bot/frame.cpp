@@ -7,6 +7,20 @@
 #include <limits>
 #include <queue>
 
+PathSegment::PathSegment()
+  : direction(hlt::Direction::STILL),
+    halite(0),
+    deposited_halite(0)
+{
+}
+
+PathSegment::PathSegment(hlt::Direction direction, hlt::Halite halite, hlt::Halite deposited_halite)
+  : direction(direction),
+    halite(halite),
+    deposited_halite(deposited_halite)
+{
+}
+
 Frame::Frame(const hlt::Game& game) : game(game) {}
 
 const hlt::Game& Frame::get_game() const {
@@ -46,20 +60,28 @@ struct SearchState {
     }
 };
 
-Path get_search_path(
+SearchPath get_search_path(
     hlt::GameMap& map,
     SearchState* search_state,
     hlt::Position start,
     hlt::Position end,
     int max_depth
 ) {
-    Path res(max_depth);
+    SearchPath res(max_depth);
     hlt::Position current_pos = end;
     for (int depth=max_depth; depth>0; depth--) {
         int idx = get_depth_index(depth, map, current_pos);
-        res[depth-1] = search_state[idx].in_direction;
-        current_pos = current_pos.directional_offset(hlt::invert_direction(res[depth-1]));
-        current_pos = map.normalize(current_pos);
+        auto prev_pos = current_pos.directional_offset(
+            hlt::invert_direction(search_state[idx].in_direction));
+        prev_pos = map.normalize(prev_pos);
+        int prev_idx = get_depth_index(depth-1, map, current_pos);
+
+        res[depth-1] = PathSegment(
+            search_state[idx].in_direction,
+            search_state[prev_idx].halite,
+            search_state[prev_idx].deposited_halite
+        );
+        current_pos = prev_pos;
     }
     return res;
 }
@@ -71,7 +93,7 @@ bool should_update_search(SearchState& cur, hlt::Halite halite, SearchState& bes
 }
 
 // Find an optimal path to a point for a ship on a specific map.
-Path Frame::get_optimal_path(
+SearchPath Frame::get_optimal_path(
     hlt::GameMap& map,
     hlt::Ship& ship,
     hlt::Position end,

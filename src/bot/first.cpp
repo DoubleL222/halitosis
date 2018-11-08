@@ -3,12 +3,12 @@
 #include "bot/game_clone.hpp"
 
 Plan::Plan()
-  : path(Path()),
+  : path(SearchPath()),
     execution_step(0)
 {
 }
 
-Plan::Plan(Path path)
+Plan::Plan(SearchPath path)
   : path(path),
     execution_step(0)
 {
@@ -19,7 +19,7 @@ bool Plan::is_finished() {
 }
 
 hlt::Direction Plan::next_move() const {
-    return path[execution_step];
+    return path[execution_step].direction;
 }
 
 void Plan::advance() {
@@ -90,7 +90,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
 
 			//TODO get closest deploy position
 			auto path = frame.get_direct_path(game_clone.get_map(), *ship, player->shipyard->position);
-			plans[id] = Plan(path);
+			//plans[id] = Plan(path);
 		}
 	}
 
