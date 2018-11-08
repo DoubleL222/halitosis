@@ -93,13 +93,12 @@ bool should_update_search(SearchState& cur, hlt::Halite halite, SearchState& bes
 }
 
 // Find an optimal path to a point for a ship on a specific map.
-SearchPath Frame::get_optimal_path(
+OptimalPath Frame::get_optimal_path(
     hlt::GameMap& map,
     hlt::Ship& ship,
     hlt::Position end,
     time_point end_time,
-    size_t max_depth,
-    PathSelectionStrategy selection_strategy
+    size_t max_depth
 ) {
     auto start = ship.position;
     auto search_state_owned = std::make_unique<SearchState[]>(max_depth*get_board_size());
@@ -197,29 +196,31 @@ SearchPath Frame::get_optimal_path(
         }
     }
 
-    int best_depth = 1;
-    if (selection_strategy == PathSelectionStrategy::ShortTerm) {
-        float best_halite_per_turn = 0;
-        for (unsigned int depth=1; depth < search_depth; depth++) {
-            int idx = get_depth_index(depth, map, end);
-            float halite_per_turn = ((float)(search_state[idx].get_worth()))/depth;
-            if (halite_per_turn > best_halite_per_turn) {
-                best_halite_per_turn = halite_per_turn;
-                best_depth = depth;
-            }
-        }
-    } else {
-        auto best_halite = 0;
-        for (unsigned int depth=1; depth < search_depth; depth++) {
-            int idx = get_depth_index(depth, map, end);
-            auto total_halite = search_state[idx].get_worth();
-            if (total_halite > best_halite) {
-                best_halite = total_halite;
-                best_depth = depth;
-            }
+    int best_short_term_depth = 1;
+    int best_long_term_depth = 1;
+
+    float best_halite_per_turn = 0;
+    for (unsigned int depth=1; depth < search_depth; depth++) {
+        int idx = get_depth_index(depth, map, end);
+        float halite_per_turn = ((float)(search_state[idx].get_worth()))/depth;
+        if (halite_per_turn > best_halite_per_turn) {
+            best_halite_per_turn = halite_per_turn;
+            best_short_term_depth = depth;
         }
     }
-    return get_search_path(map, search_state, start, end, best_depth);
+    auto best_halite = 0;
+    for (unsigned int depth=1; depth < search_depth; depth++) {
+        int idx = get_depth_index(depth, map, end);
+        auto total_halite = search_state[idx].get_worth();
+        if (total_halite > best_halite) {
+            best_halite = total_halite;
+            best_long_term_depth = depth;
+        }
+    }
+    OptimalPath res;
+    res.short_term = get_search_path(map, search_state, start, end, best_short_term_depth);
+    res.long_term = get_search_path(map, search_state, start, end, best_long_term_depth);
+    return res;
 }
 
 int Frame::get_index(hlt::Position position) const {

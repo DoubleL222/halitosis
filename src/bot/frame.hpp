@@ -18,10 +18,9 @@ struct PathSegment {
 using Path = std::vector<hlt::Direction>;
 using SearchPath = std::vector<PathSegment>;
 
-// Strategy used by get_optimal_path to select plan depth.
-enum class PathSelectionStrategy {
-    ShortTerm, // Maximize halite per turn
-    LongTerm // Maximize total halite at last searched step
+struct OptimalPath {
+    SearchPath short_term;
+    SearchPath long_term;
 };
 
 // A wrapper around the game with helper methods for the current frame of the game.
@@ -41,13 +40,12 @@ public:
     hlt::Position move(hlt::Position pos, int direction_x, int direction_y);
     hlt::Position move(hlt::Position pos, hlt::Direction direction);
 
-    SearchPath get_optimal_path(
+    OptimalPath get_optimal_path(
         hlt::GameMap& map,
         hlt::Ship& ship,
         hlt::Position end,
         time_point end_time,
-        size_t max_depth,
-        PathSelectionStrategy selection_strategy);
+        size_t max_depth);
 
 	//Direct path
 	Path get_direct_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);

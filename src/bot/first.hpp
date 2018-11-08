@@ -23,18 +23,8 @@ struct Plan {
 
 class FirstBot : public Bot {
     std::mt19937 rng;
-
     std::unordered_map<hlt::EntityId, Plan> plans;
-
-	hlt::Game advance_game(hlt::Game& game, std::vector<hlt::Command> moves);
-
-	enum bot_state {building_and_gathering, hoarding_and_gathering, returning};
-
-	bot_state current_bot_state;
-
-	//Factors for optimal ship number
-	float factor_halite_left;
-	float factor_turns_left;
+    bool should_build_ship;
 
 public:
     FirstBot(unsigned int seed);
@@ -42,4 +32,7 @@ public:
     void init(hlt::Game& game);
 
     std::vector<hlt::Command> run(const hlt::Game& game, time_point end_time);
+
+private:
+	hlt::Game advance_game(hlt::Game& game, std::vector<hlt::Command> moves);
 };
