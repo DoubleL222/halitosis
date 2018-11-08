@@ -119,7 +119,8 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
                     *ship,
                     player->shipyard->position,
                     now+time_per_plan,
-                    MAX_SEARCH_DEPTH);
+                    MAX_SEARCH_DEPTH,
+                    PathSelectionStrategy::ShortTerm);
 
 				plans[id] = Plan(path);
 

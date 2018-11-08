@@ -8,6 +8,12 @@
 
 using Path = std::vector<hlt::Direction>;
 
+// Strategy used by get_optimal_path to select plan depth.
+enum class PathSelectionStrategy {
+    ShortTerm, // Maximize halite per turn
+    LongTerm // Maximize total halite at last searched step
+};
+
 // A wrapper around the game with helper methods for the current frame of the game.
 class Frame {
     const hlt::Game& game;
@@ -25,9 +31,13 @@ public:
     hlt::Position move(hlt::Position pos, int direction_x, int direction_y);
     hlt::Position move(hlt::Position pos, hlt::Direction direction);
 
-    Path get_optimal_path(hlt::Ship& ship, hlt::Position end, time_point end_time, size_t max_depth);
     Path get_optimal_path(
-        hlt::GameMap& map, hlt::Ship& ship, hlt::Position end, time_point end_time, size_t max_depth);
+        hlt::GameMap& map,
+        hlt::Ship& ship,
+        hlt::Position end,
+        time_point end_time,
+        size_t max_depth,
+        PathSelectionStrategy selection_strategy);
 
 	//Direct path
 	Path get_direct_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);
