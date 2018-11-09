@@ -65,7 +65,9 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
 
     if (
         player->halite >= 1000
-        && !game_clone.is_cell_occupied(player->shipyard->position, 1)
+		&& !game.game_map->at(player->shipyard)->is_occupied()
+        && !game_clone.is_cell_occupied(player->shipyard->position, 0)
+		&& !game_clone.is_cell_occupied(player->shipyard->position, 1)
         && should_build_ship
     ) {
         commands.push_back(player->shipyard->spawn());
