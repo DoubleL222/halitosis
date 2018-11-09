@@ -91,9 +91,6 @@ OptimalPath Frame::get_optimal_path(
     time_point end_time,
     unsigned int max_depth
 ) {
-    unsigned int turns_left = hlt::constants::MAX_TURNS-game.turn_number;
-    max_depth = std::min(max_depth, turns_left);
-
     auto start = ship.position;
     auto search_state_owned = std::make_unique<SearchState[]>(max_depth*get_board_size());
     auto search_state = search_state_owned.get();
@@ -217,13 +214,15 @@ unsigned int Frame::get_board_size() const {
 struct Edge {
     unsigned int from;
     unsigned int to;
-    bool full;
+    unsigned int capacity;
+    unsigned int residual;
     bool priority;
 
-    Edge(unsigned int from, unsigned int to, bool priority)
+    Edge(unsigned int from, unsigned int to, bool priority, unsigned int capacity=1)
       : from(from),
         to(to),
-        full(false),
+        capacity(capacity),
+        residual(0),
         priority(priority)
     {
     }
@@ -235,17 +234,28 @@ struct Edge {
 
     // Whether the edge can be traversed from the specified node.
     bool is_traversable(unsigned int current_node, bool priority_only) const {
-        return (priority || !priority_only) && (current_node == from ? !full : full);
+        if (!priority && priority_only) { return false; }
+        if (current_node == from) {
+            return capacity > 0;
+        } else {
+            return residual > 0;
+        }
     }
 
     // Send 1 unit of flow through this edge.
-    void flow() {
-        full = !full;
+    void flow(unsigned int current_node) {
+        if (current_node == from) {
+            capacity--;
+            residual++;
+        } else {
+            residual--;
+            capacity++;
+        }
     }
 };
 
 std::ostream& operator<<(std::ostream& os, const Edge& self) {
-    os << "Edge { from: " << self.from << ", to: " << self.to << ", full: " << self.full << ", priority: " << self.priority << " }";
+    os << "Edge { from: " << self.from << ", to: " << self.to << ", capacity: " << self.capacity << ", residual: " << self.residual  << ", priority: " << self.priority << " }";
     return os;
 }
 
@@ -300,8 +310,8 @@ struct FlowGraph {
         int back_node = 1;
         while (back_node != 0) {
             auto& edge = edges[from_edge[back_node]];
-            edge.flow();
             back_node = edge.neighbor(back_node);
+            edge.flow(back_node);
         }
         return true;
     }
@@ -331,8 +341,16 @@ std::ostream& operator<<(std::ostream& os, const FlowGraph& graph) {
     return os;
 }
 
+hlt::Position Frame::indexToPosition(int idx) {
+    int width = game.game_map->width;
+    int x = idx%width;
+    int y = idx/width;
+    return hlt::Position(x, y);
+}
+
 std::unordered_map<hlt::EntityId, hlt::Direction> Frame::avoid_collisions(
-    std::unordered_map<hlt::EntityId, hlt::Direction>& moves
+    std::unordered_map<hlt::EntityId, hlt::Direction>& moves,
+    bool ignore_collisions_at_dropoff
 ) {
     // Reduce to flow problem.
     // There are nodes for each ship, each cell + source, sink.
@@ -361,7 +379,15 @@ std::unordered_map<hlt::EntityId, hlt::Direction> Frame::avoid_collisions(
         }
     }
     for (size_t i=0; i<get_board_size(); i++) {
-        graph.edges.push_back(Edge(2+ships.size()+i, 1, true));
+        unsigned int capacity = 1;
+        if (ignore_collisions_at_dropoff) {
+            auto structure = game.game_map->at(indexToPosition(i))->structure;
+            if (structure && structure->owner == game.my_id) {
+                // Allow collisions here
+                capacity = 10;
+            }
+        }
+        graph.edges.push_back(Edge(2+ships.size()+i, 1, true, capacity));
     }
     graph.finalize(2+ships.size()+get_board_size());
 
@@ -377,7 +403,7 @@ std::unordered_map<hlt::EntityId, hlt::Direction> Frame::avoid_collisions(
         hlt::Direction new_move = hlt::Direction::STILL;
         for (auto& edge_idx : graph.nodes[2+i]) {
             auto edge = graph.edges[edge_idx];
-            if (edge.from == 2+i && edge.full) {
+            if (edge.from == 2+i && edge.capacity == 0) {
                 if (edge.to == 2+ships.size()+cell_index) {
                     new_move = hlt::Direction::STILL;
                 } else {

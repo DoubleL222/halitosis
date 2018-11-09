@@ -82,13 +82,13 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
     auto time_per_plan = time_budget;
     if (num_finished_plans != 0) { time_per_plan /= num_finished_plans; }
 
+    unsigned int turns_left = hlt::constants::MAX_TURNS-frame.get_game().turn_number;
     for (auto& pair : player->ships) {
         auto id = pair.first;
         auto& ship = pair.second;
 
         // Create plans if necessary.
         if (plans[ship->id].is_finished()) {
-            unsigned int turns_left = hlt::constants::MAX_TURNS-frame.get_game().turn_number;
             auto max_depth = std::min(MAX_SEARCH_DEPTH, turns_left);
 
             auto now = ms_clock::now();
@@ -121,7 +121,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
     }
 
     //Collision avoidance,
-    auto new_moves = frame.avoid_collisions(moves);
+    auto new_moves = frame.avoid_collisions(moves, turns_left < 15);
 
     // Find moves for each ship, avoiding collisions.
     for (auto& pair : player->ships) {
