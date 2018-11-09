@@ -43,8 +43,10 @@ void FirstBot::init(hlt::Game& game) {
 }
 
 // Max depth used by get_optimal_path
-const size_t MAX_SEARCH_DEPTH = 200;
-const float SHIP_BUILD_FACTOR = 0.9;
+const unsigned int MAX_SEARCH_DEPTH = 200;
+// Assume that a new ship will collect halite at this rate compared to the most recent ship for
+// the rest of the game.
+const float SHIP_BUILD_FACTOR = 0.5;
 
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_time) {
     Frame frame(game);
@@ -86,6 +88,9 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
 
         // Create plans if necessary.
         if (plans[ship->id].is_finished()) {
+            unsigned int turns_left = hlt::constants::MAX_TURNS-frame.get_game().turn_number;
+            auto max_depth = std::min(MAX_SEARCH_DEPTH, turns_left);
+
             auto now = ms_clock::now();
             //Make path on the map clone
             auto path = frame.get_optimal_path(
@@ -93,12 +98,16 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
                 *ship,
                 player->shipyard->position,
                 now+time_per_plan,
-                MAX_SEARCH_DEPTH);
+                max_depth);
 
             plans[id] = Plan(path.max_per_turn);
             if (path.max_total.size() > 0) {
-                auto worth = path.max_total[path.max_total.size()-1].halite;
-                should_build_ship = (worth > hlt::constants::SHIP_COST*SHIP_BUILD_FACTOR);
+                auto worth = path.max_per_turn[path.max_per_turn.size()-1].halite;
+                auto per_turn = ((float)worth)/path.max_per_turn.size();
+                auto expected_total = turns_left*per_turn;
+                if (SHIP_BUILD_FACTOR*expected_total < hlt::constants::SHIP_COST) {
+                    should_build_ship = false;
+                }
             }
 
             //Update clone map with current plan
