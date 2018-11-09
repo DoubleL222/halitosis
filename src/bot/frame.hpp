@@ -9,18 +9,17 @@
 struct PathSegment {
     hlt::Direction direction;
     hlt::Halite halite;
-    hlt::Halite deposited_halite;
 
     PathSegment();
-    PathSegment(hlt::Direction direction, hlt::Halite halite, hlt::Halite deposited_halite);
+    PathSegment(hlt::Direction direction, hlt::Halite halite);
 };
 
 using Path = std::vector<hlt::Direction>;
 using SearchPath = std::vector<PathSegment>;
 
 struct OptimalPath {
-    SearchPath short_term;
-    SearchPath long_term;
+    SearchPath max_per_turn;
+    SearchPath max_total;
 };
 
 // A wrapper around the game with helper methods for the current frame of the game.
@@ -45,7 +44,7 @@ public:
         hlt::Ship& ship,
         hlt::Position end,
         time_point end_time,
-        size_t max_depth);
+        unsigned int max_depth);
 
 	//Direct path
 	Path get_direct_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);

@@ -44,6 +44,7 @@ void FirstBot::init(hlt::Game& game) {
 
 // Max depth used by get_optimal_path
 const size_t MAX_SEARCH_DEPTH = 200;
+const float SHIP_BUILD_FACTOR = 0.9;
 
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_time) {
     Frame frame(game);
@@ -94,15 +95,20 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
                 now+time_per_plan,
                 MAX_SEARCH_DEPTH);
 
-            plans[id] = Plan(path.short_term);
-            auto& last_segment = path.long_term[path.long_term.size()-1];
-            auto long_term_worth = last_segment.halite+last_segment.deposited_halite;
-            should_build_ship = (long_term_worth > hlt::constants::SHIP_COST);
+            plans[id] = Plan(path.max_per_turn);
+            if (path.max_total.size() > 0) {
+                auto worth = path.max_total[path.max_total.size()-1].halite;
+                should_build_ship = (worth > hlt::constants::SHIP_COST*SHIP_BUILD_FACTOR);
+            }
 
             //Update clone map with current plan
             game_clone.advance_game(plans[id], *ship);
         }
-        moves[id] = plans[id].next_move();
+        if (plans[id].is_finished()) {
+            moves[id] = hlt::Direction::STILL;
+        } else {
+            moves[id] = plans[id].next_move();
+        }
     }
 
     //Collision avoidance,
