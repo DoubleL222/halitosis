@@ -49,6 +49,8 @@ public:
 	//Direct path
 	Path get_direct_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);
 
+    void ensure_moves_possible(std::unordered_map<hlt::EntityId, hlt::Direction>& moves);
+
     // Update the moves map to avoid collisions between own ships.
     std::unordered_map<hlt::EntityId, hlt::Direction> avoid_collisions(
         std::unordered_map<hlt::EntityId, hlt::Direction>& moves,

@@ -121,6 +121,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         }
     }
 
+    frame.ensure_moves_possible(moves);
     //Collision avoidance,
     auto new_moves = frame.avoid_collisions(moves, turns_left < 15);
 

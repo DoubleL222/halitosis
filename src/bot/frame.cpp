@@ -348,6 +348,16 @@ hlt::Position Frame::indexToPosition(int idx) {
     return hlt::Position(x, y);
 }
 
+void Frame::ensure_moves_possible(std::unordered_map<hlt::EntityId, hlt::Direction>& moves) {
+    for (auto p : game.me->ships) {
+        auto ship = p.second;
+        auto move_cost = game.game_map->at(ship)->halite/hlt::constants::MOVE_COST_RATIO;
+        if (ship->halite < move_cost) {
+            moves[ship->id] = hlt::Direction::STILL;
+        }
+    }
+}
+
 std::unordered_map<hlt::EntityId, hlt::Direction> Frame::avoid_collisions(
     std::unordered_map<hlt::EntityId, hlt::Direction>& moves,
     bool ignore_collisions_at_dropoff
