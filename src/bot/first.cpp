@@ -91,13 +91,15 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
             auto max_depth = std::min(MAX_SEARCH_DEPTH, turns_left-4);
 
             auto now = ms_clock::now();
+            unsigned int defensive_turns = (game.players.size() == 4 ? 150 : 0);
             //Make path on the map clone
             auto path = frame.get_optimal_path(
                 game_clone.get_map(),
                 *ship,
                 player->shipyard->position,
                 now+time_per_plan,
-                max_depth);
+                max_depth,
+                defensive_turns);
 
             plans[id] = Plan(path.max_per_turn);
             if (path.max_total.size() > 0) { // Prevents a crash when game is ending

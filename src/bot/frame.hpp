@@ -49,7 +49,11 @@ public:
         hlt::Ship& ship,
         hlt::Position end,
         time_point end_time,
-        unsigned int max_depth);
+        unsigned int max_depth,
+        // Number of turns in which ships should stay closest to own shipyard.
+        unsigned int defensive_turns);
+
+    hlt::PlayerId get_closest_shipyard(hlt::Position pos);
 
 	//Direct path
 	Path get_direct_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);

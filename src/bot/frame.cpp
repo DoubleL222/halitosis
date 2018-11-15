@@ -89,7 +89,8 @@ OptimalPath Frame::get_optimal_path(
     hlt::Ship& ship,
     hlt::Position end,
     time_point end_time,
-    unsigned int max_depth
+    unsigned int max_depth,
+    unsigned int defensive_turns
 ) {
     auto start = ship.position;
     auto search_state_owned = std::make_unique<SearchState[]>(max_depth*get_board_size());
@@ -112,6 +113,7 @@ OptimalPath Frame::get_optimal_path(
         search_depth < max_depth-1 && now < end_time;
         now = ms_clock::now(), search_depth++
     ) {
+        unsigned int current_turn = game.turn_number+search_depth;
         for (int dy=-search_depth; dy <= static_cast<int>(search_depth); dy++) {
             for (int dx=-search_depth; dx <= static_cast<int>(search_depth); dx++) {
                 auto pos = move(start, dx, dy);
@@ -134,18 +136,21 @@ OptimalPath Frame::get_optimal_path(
                 if (halite_after_move >= 0) {
                     for (auto direction : hlt::ALL_CARDINALS) {
                         auto new_pos = move(pos, direction);
-                        int new_idx = get_depth_index(search_depth+1, map, new_pos);
+                        bool defensive_move = (get_closest_shipyard(new_pos) == game.my_id);
+                        if (current_turn >= defensive_turns || defensive_move) {
+                            int new_idx = get_depth_index(search_depth+1, map, new_pos);
 
-                        bool update = should_update_search(
-                            search_state[cur_idx],
-                            halite_after_move,
-                            search_state[new_idx]);
-                        if (update) {
-                            search_state[new_idx].board_override
-                                = search_state[cur_idx].board_override;
-                            search_state[new_idx].in_direction = direction;
-                            search_state[new_idx].visited = true;
-                            search_state[new_idx].halite = halite_after_move;
+                            bool update = should_update_search(
+                                search_state[cur_idx],
+                                halite_after_move,
+                                search_state[new_idx]);
+                            if (update) {
+                                search_state[new_idx].board_override
+                                    = search_state[cur_idx].board_override;
+                                search_state[new_idx].in_direction = direction;
+                                search_state[new_idx].visited = true;
+                                search_state[new_idx].halite = halite_after_move;
+                            }
                         }
                     }
                 }
@@ -195,6 +200,20 @@ OptimalPath Frame::get_optimal_path(
     OptimalPath res;
     res.max_per_turn = get_search_path(map, search_state, start, end, best_per_turn_depth);
     res.max_total = get_search_path(map, search_state, start, end, best_total_depth);
+    return res;
+}
+
+hlt::PlayerId Frame::get_closest_shipyard(hlt::Position pos) {
+    auto res = 0;
+    auto mindist = 99999;
+    for (auto player : game.players) {
+        auto shipyard_pos = player->shipyard->position;
+        auto dist = game.game_map->calculate_distance(pos, shipyard_pos);
+        if (dist < mindist) {
+            mindist = dist;
+            res = player->id;
+        }
+    }
     return res;
 }
 
