@@ -14,11 +14,14 @@ Plan::Plan(SearchPath path)
 {
 }
 
-bool Plan::is_finished() {
+bool Plan::is_finished() const {
     return execution_step >= path.size();
 }
 
 hlt::Direction Plan::next_move() const {
+    if (is_finished()) {
+        return hlt::Direction::STILL;
+    }
     return path[execution_step].direction;
 }
 
@@ -97,7 +100,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
                 max_depth);
 
             plans[id] = Plan(path.max_per_turn);
-            if (path.max_total.size() > 0) {
+            if (path.max_total.size() > 0) { // Prevents a crash when game is ending
                 auto worth = path.max_per_turn[path.max_per_turn.size()-1].halite;
                 auto per_turn = ((float)worth)/path.max_per_turn.size();
                 auto expected_total = turns_left*per_turn;
@@ -109,11 +112,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
             //Update clone map with current plan
             game_clone.advance_game(plans[id], *ship);
         }
-        if (plans[id].is_finished()) {
-            moves[id] = hlt::Direction::STILL;
-        } else {
-            moves[id] = plans[id].next_move();
-        }
+        moves[id] = plans[id].next_move();
     }
 
     frame.ensure_moves_possible(moves);
@@ -125,7 +124,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         auto id = pair.first;
         auto& ship = pair.second;
 
-        if (moves[id] == collision_res.safe_moves[id]) {
+        if (plans[id].next_move() == collision_res.safe_moves[id]) {
             plans[id].advance();
         }
         commands.push_back(ship->move(collision_res.safe_moves[id]));

@@ -15,7 +15,7 @@ struct Plan {
     Plan();
     Plan(SearchPath path);
 
-    bool is_finished();
+    bool is_finished() const;
 
     hlt::Direction next_move() const;
     void advance();
