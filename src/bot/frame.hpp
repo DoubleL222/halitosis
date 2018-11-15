@@ -22,6 +22,11 @@ struct OptimalPath {
     SearchPath max_total;
 };
 
+struct SpawnRes {
+    bool is_spawn_possible;
+    std::unordered_map<hlt::EntityId, hlt::Direction> safe_moves;
+};
+
 // A wrapper around the game with helper methods for the current frame of the game.
 class Frame {
     const hlt::Game& game;
@@ -52,9 +57,11 @@ public:
     void ensure_moves_possible(std::unordered_map<hlt::EntityId, hlt::Direction>& moves);
 
     // Update the moves map to avoid collisions between own ships.
-    std::unordered_map<hlt::EntityId, hlt::Direction> avoid_collisions(
+    SpawnRes avoid_collisions(
         std::unordered_map<hlt::EntityId, hlt::Direction>& moves,
-        bool ignore_collisions_at_dropoff
+        bool ignore_collisions_at_dropoff,
+        // Whether a the controller wants to spawn a ship.
+        bool spawn_desired
     );
 
 	std::vector<hlt::MapCell*> get_cells_within_radius(const hlt::Position& center, const int radius, const DistanceMeasure distanceMeasure = DistanceMeasure::MANHATTAN);

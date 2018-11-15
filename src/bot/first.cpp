@@ -63,14 +63,9 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
 		game_clone.advance_game(plans[ship->id], *ship);
 	}
 
-    if (
-        player->halite >= 1000
-		&& !game.game_map->at(player->shipyard)->is_occupied()
-        && !game_clone.is_cell_occupied(player->shipyard->position, 0)
-		&& !game_clone.is_cell_occupied(player->shipyard->position, 1)
-        && should_build_ship
-    ) {
-        commands.push_back(player->shipyard->spawn());
+    bool spawn_desired = false;
+    if (player->halite >= 1000 && should_build_ship) {
+        spawn_desired = true;
     }
 
     std::unordered_map<hlt::EntityId, hlt::Direction> moves;
@@ -123,17 +118,20 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
 
     frame.ensure_moves_possible(moves);
     //Collision avoidance,
-    auto new_moves = frame.avoid_collisions(moves, turns_left < 15);
+    auto collision_res = frame.avoid_collisions(moves, turns_left < 15, spawn_desired);
 
     // Find moves for each ship, avoiding collisions.
     for (auto& pair : player->ships) {
         auto id = pair.first;
         auto& ship = pair.second;
 
-        if (moves[id] == new_moves[id]) {
+        if (moves[id] == collision_res.safe_moves[id]) {
             plans[id].advance();
         }
-        commands.push_back(ship->move(new_moves[id]));
+        commands.push_back(ship->move(collision_res.safe_moves[id]));
 	}
+    if (collision_res.is_spawn_possible) {
+        commands.push_back(player->shipyard->spawn());
+    }
     return commands;
 }
