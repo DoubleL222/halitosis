@@ -85,7 +85,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
 
         // Create plans if necessary.
         if (plans[ship->id].is_finished()) {
-            auto max_depth = std::min(MAX_SEARCH_DEPTH, turns_left);
+            auto max_depth = std::min(MAX_SEARCH_DEPTH, turns_left-4);
 
             auto now = ms_clock::now();
             //Make path on the map clone
