@@ -1,5 +1,6 @@
 #pragma once
 
+#include <random>
 #include "bot/frame.hpp"
 #include "hlt/game_map.hpp"
 
@@ -23,7 +24,8 @@ public:
             auto new_pos = frame.move(pos, dir);
             scent_sum += scent[frame.get_index(new_pos)];
         }
-        float rand = rng();
+        std::uniform_real_distribution<float> distribution{};
+        float rand = distribution(rng);
         float current_sum = 0;
         for (auto dir : ALL_DIRECTIONS) {
             auto new_pos = frame.move(pos, dir);
