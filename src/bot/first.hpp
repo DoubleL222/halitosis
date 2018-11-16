@@ -1,25 +1,13 @@
 #pragma once
 
 #include "bot/bot.hpp"
+#include "bot/plan.hpp"
 #include "frame.hpp"
 #include "hlt/command.hpp"
 #include "hlt/game.hpp"
 
 #include <random>
 #include <vector>
-
-struct Plan {
-    SearchPath path;
-    unsigned int execution_step;
-
-    Plan();
-    Plan(SearchPath path);
-
-    bool is_finished() const;
-
-    hlt::Direction next_move() const;
-    void advance();
-};
 
 class FirstBot : public Bot {
     std::mt19937 rng;
