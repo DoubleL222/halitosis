@@ -114,8 +114,10 @@ OptimalPath Frame::get_optimal_path(
         now = ms_clock::now(), search_depth++
     ) {
         unsigned int current_turn = game.turn_number+search_depth;
-        for (int dy=-search_depth; dy <= static_cast<int>(search_depth); dy++) {
-            for (int dx=-search_depth; dx <= static_cast<int>(search_depth); dx++) {
+        int search_dist_x = std::min(search_depth, static_cast<unsigned int>(map.width)/2);
+        int search_dist_y = std::min(search_depth, static_cast<unsigned int>(map.height)/2);
+        for (int dy=-search_dist_y; dy <= search_dist_y; dy++) {
+            for (int dx=-search_dist_x; dx <= search_dist_x; dx++) {
                 auto pos = move(start, dx, dy);
                 int cur_idx = get_depth_index(search_depth, map, pos);
                 if (!search_state[cur_idx].visited) { continue; }
@@ -175,6 +177,7 @@ OptimalPath Frame::get_optimal_path(
             }
         }
     }
+    std::cerr << search_depth << std::endl;
 
     int best_per_turn_depth = 0;
     int best_total_depth = 0;
