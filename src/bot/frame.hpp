@@ -6,6 +6,14 @@
 #include "hlt/map_cell.hpp"
 #include "bot/typedefs.hpp"
 
+static const std::array<hlt::Direction, 5> ALL_DIRECTIONS = {
+    hlt::Direction::NORTH,
+    hlt::Direction::SOUTH,
+    hlt::Direction::EAST,
+    hlt::Direction::WEST,
+    hlt::Direction::STILL
+};
+
 struct PathSegment {
     hlt::Direction direction;
     hlt::Halite halite;
@@ -76,9 +84,10 @@ public:
 
     // Retrieve the number of cells on the board
     unsigned int get_board_size() const;
-private:
+
     // Converts a position to an index in the grid when stored as a row-order matrix.
     int get_index(hlt::Position pos) const;
 
+private:
     hlt::Position indexToPosition(int idx);
 };
