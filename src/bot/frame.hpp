@@ -60,6 +60,8 @@ public:
 
     void ensure_moves_possible(std::unordered_map<hlt::EntityId, hlt::Direction>& moves);
 
+    void avoid_enemy_collisions(std::unordered_map<hlt::EntityId, hlt::Direction>& moves);
+
     // Update the moves map to avoid collisions between own ships.
     SpawnRes avoid_collisions(
         std::unordered_map<hlt::EntityId, hlt::Direction>& moves,

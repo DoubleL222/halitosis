@@ -389,6 +389,17 @@ void Frame::ensure_moves_possible(std::unordered_map<hlt::EntityId, hlt::Directi
     }
 }
 
+void Frame::avoid_enemy_collisions(std::unordered_map<hlt::EntityId, hlt::Direction>& moves) {
+    for (auto p : game.me->ships) {
+        auto ship = p.second;
+        auto destination = move(ship->position, moves[ship->id]);
+        auto destination_ship = game.game_map->at(destination)->ship;
+        if (destination_ship && destination_ship->owner != game.my_id) {
+            moves[ship->id] = hlt::Direction::STILL;
+        }
+    }
+}
+
 SpawnRes Frame::avoid_collisions(
     std::unordered_map<hlt::EntityId, hlt::Direction>& moves,
     bool ignore_collisions_at_dropoff,

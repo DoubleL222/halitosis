@@ -118,6 +118,9 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
     }
 
     frame.ensure_moves_possible(moves);
+    if (game.players.size() == 4) {
+        frame.avoid_enemy_collisions(moves);
+    }
     //Collision avoidance,
     auto collision_res = frame.avoid_collisions(moves, turns_left < 15, spawn_desired);
 
