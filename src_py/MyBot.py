@@ -17,6 +17,9 @@ import random
 #   (print statements) are reserved for the engine-bot communication.
 import logging
 
+#simulation
+import bot.simulated_game
+import bot.random_bot
 """ <<<Game Begin>>> """
 
 # This game object contains the initial game state.
@@ -42,6 +45,13 @@ while True:
 
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
+
+    #SIMULATION
+    sim = bot.simulated_game.GameSimulator(game)
+    default_policy = bot.random_bot.RandomBot(sim.game_copy, me.id)
+    sim.run_simulation(default_policy)
+    #END SIMULATION
+
     command_queue = []
 
     for ship in me.get_ships():
