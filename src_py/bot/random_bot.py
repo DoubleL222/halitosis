@@ -9,6 +9,7 @@ from hlt.positionals import Direction
 import random
 
 import logging
+import timeit
 
 class RandomBot:
     def __init__(self, game, id):
@@ -17,15 +18,15 @@ class RandomBot:
 
     def run(self, game):
         #print("RUN")
-        logging.info("RUN")
         command_queue = []
         me = game.players[self.id]
         #print("Ships: " + str(len(me.get_ships())))
+        #logging.info(str(len(me.get_ships())))
         game_map = game.game_map
 
         for ship in me.get_ships():
             #print("IN SHIPS FOR LOOP")
-            logging.info("IN SHIPS FOR LOOP")
+            #logging.info("IN SHIPS FOR LOOP")
             # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
             #   Else, collect halite.
             if game_map[ship.position].halite_amount < constants.MAX_HALITE / 10 or ship.is_full:

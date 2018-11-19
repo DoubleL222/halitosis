@@ -20,6 +20,8 @@ import logging
 #simulation
 import bot.simulated_game
 import bot.random_bot
+
+import timeit
 """ <<<Game Begin>>> """
 
 # This game object contains the initial game state.
@@ -47,9 +49,19 @@ while True:
     #   end of the turn.
 
     #SIMULATION
+    start = timeit.default_timer()
+
     sim = bot.simulated_game.GameSimulator(game)
     default_policy = bot.random_bot.RandomBot(sim.game_copy, me.id)
     sim.run_simulation(default_policy)
+
+    end = timeit.default_timer()
+    logging.info("------------ PERFORMANCE REPORT -------------")
+    bot.profiling.print_ms_message((end - start), "Simulation took: ")
+    bot.profiling.print_ms_message(sim.deep_copy_time_sum, "Deep copy took: ")
+    bot.profiling.print_ms_message(sim.bot_time_sum, "Bot took: ")
+    bot.profiling.print_ms_message(sim.advance_game_time_sum, "Advance game took: ")
+
     #END SIMULATION
 
     command_queue = []
