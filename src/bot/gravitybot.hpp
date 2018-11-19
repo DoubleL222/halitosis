@@ -9,12 +9,12 @@
 #include <random>
 #include <vector>
 
-class ScentBot : public Bot {
+class GravityBot : public Bot {
     std::mt19937 rng;
     std::unordered_map<hlt::EntityId, Plan> plans;
 
 public:
-    ScentBot(unsigned int seed);
+    GravityBot(unsigned int seed);
 
     void init(hlt::Game& game);
 
