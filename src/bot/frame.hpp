@@ -61,6 +61,9 @@ public:
         // Number of turns in which ships should stay closest to own shipyard.
         unsigned int defensive_turns);
 
+    // Find the cell with the highest halite/distance.
+    hlt::Position find_close_halite(hlt::GameMap& map, hlt::Position start);
+
     hlt::PlayerId get_closest_shipyard(hlt::Position pos);
 
 	//Direct path

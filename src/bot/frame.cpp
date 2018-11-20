@@ -177,7 +177,6 @@ OptimalPath Frame::get_optimal_path(
             }
         }
     }
-    std::cerr << search_depth << std::endl;
 
     int best_per_turn_depth = 0;
     int best_total_depth = 0;
@@ -204,6 +203,36 @@ OptimalPath Frame::get_optimal_path(
     res.max_per_turn = get_search_path(map, search_state, start, end, best_per_turn_depth);
     res.max_total = get_search_path(map, search_state, start, end, best_total_depth);
     return res;
+}
+
+hlt::Position Frame::find_close_halite(hlt::GameMap& map, hlt::Position start) {
+    auto visited = std::vector<bool>(get_board_size());
+
+    hlt::Position best(0, 0);
+    float best_per_turn = 0;
+
+    std::queue<hlt::Position> queue;
+    queue.push(start);
+    while (!queue.empty()) {
+        auto pos = queue.front();
+        queue.pop();
+
+        auto idx = get_index(pos);
+        if (!visited[idx]) {
+            visited[idx] = true;
+            auto dist = map.calculate_distance(start, pos);
+            float halite = map.at(pos)->halite;
+            auto per_turn = halite/dist;
+            if (per_turn > best_per_turn) {
+                best_per_turn = per_turn;
+                best = pos;
+            }
+            for (auto dir : hlt::ALL_CARDINALS) {
+                queue.push(move(pos, dir));
+            }
+        }
+    }
+    return best;
 }
 
 hlt::PlayerId Frame::get_closest_shipyard(hlt::Position pos) {
