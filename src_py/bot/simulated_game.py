@@ -94,7 +94,7 @@ class GameSimulator:
                         if ship_halite >= move_cost:
                             if not current_cell.occupied_this_round:
                                 current_cell.ship = None
-                                self.game_copy.game_map[ship_to_move.position] = current_cell
+                                self.game_copy.game_map[ship_to_move.position].ship = None
                             ship_halite -= move_cost
                             if split_command[2] == "n":
                                 ship_position = self.move(ship_position, 1, 0)
@@ -113,15 +113,18 @@ class GameSimulator:
                             if next_cell.occupied_this_round:
                                 # Destroy both ships
                                 logging.warning("Ship "+str(ship_id) + ", owned by " + str(
-                                    player_id) + "Collided ")
+                                    player_id) + "Collided with "+ str(next_cell.ship.id) + ", owned by " + str(
+                                    next_cell.ship.owner))
                                 self.game_copy.players[player_id].remove_ship(ship_id)
-                                if next_cell.ship is not None:
-                                    self.game_copy.players[next_cell.ship.owner].remove_ship(next_cell.ship.id)
-                                    next_cell.ship = None
+                                #if next_cell.ship is not None:
+                                #    self.game_copy.players[next_cell.ship.owner].remove_ship(next_cell.ship.id)
+                                #    next_cell.ship = None
+                                #    self.game_copy.game_map[ship_to_move.position].ship = None
                             else:
                                 next_cell.ship = ship_to_move
                             next_cell.occupied_this_round = True
-                            self.game_copy.game_map[ship_to_move.position] = next_cell
+                            self.game_copy.game_map[ship_to_move.position].occupied_this_round = True
+                            #self.game_copy.game_map[ship_to_move.position] = next_cell
 
 
                         else:

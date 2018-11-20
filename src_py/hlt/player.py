@@ -1,6 +1,7 @@
 from .entity import Shipyard, Ship, Dropoff
 from .positionals import Position
 from .common import read_input
+import logging
 
 class Player:
     """
@@ -56,7 +57,9 @@ class Player:
         self._ships[ship_id] = ship
 
     def remove_ship(self, ship_id):
-        del self._ships[ship_id]
+        logging.warning("shipID " + str(ship_id) + " ;" + str(self._ships))
+        if ship_id in self._ships:
+            del self._ships[ship_id]
 
     def has_ship(self, ship_id):
         """
