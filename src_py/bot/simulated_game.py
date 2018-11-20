@@ -54,6 +54,9 @@ class GameSimulator:
         position.y += dy
         return position
 
+    def clean_map(self):
+        for index, cell in self.game_copy.game_map._cells:
+            self.game_copy.game_map._cells[index].occupied_this_round = False
 
     def advance_game(self, commands, player_id):
         # Profiling
@@ -152,7 +155,7 @@ class GameSimulator:
         end = timeit.default_timer()
         # bot.profiling.print_ms_message((end-start), "Advance game took")
         # TODO clean up map
-
+        self.clean_map()
         self.advance_game_time_sum = self.advance_game_time_sum + (end-start)
     def run_simulation(self, bot):
         while self.game_copy.turn_number < 500:
