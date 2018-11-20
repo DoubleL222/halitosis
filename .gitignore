@@ -45,3 +45,6 @@ CMakeCache.txt
 replays
 halite
 *.log
+
+#some other editor swap file
+*.orig
