@@ -21,6 +21,12 @@ class Player:
         """
         return self._ships[ship_id]
 
+    def get_ships_dict(self):
+        """
+        :return: all ship dictionary
+        """
+        return self._ships
+
     def get_ships(self):
         """
         :return: Returns all ship objects in a list
@@ -40,6 +46,17 @@ class Player:
         :return: Returns all dropoff objects in a list
         """
         return list(self._dropoffs.values())
+
+    def add_ship(self, ship, ship_id):
+        """
+        :param ship: ship object to add
+        :param ship_id: ship id to add
+        :return: nothing
+        """
+        self._ships[ship_id] = ship
+
+    def remove_ship(self, ship_id):
+        del self._ships[ship_id]
 
     def has_ship(self, ship_id):
         """

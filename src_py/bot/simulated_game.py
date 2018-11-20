@@ -9,6 +9,7 @@ import random
 from hlt.positionals import Direction
 #Import ship
 from hlt.entity import Ship
+from hlt.game_map import MapCell
 #import logging
 import logging
 
@@ -32,44 +33,127 @@ class GameSimulator:
         end = timeit.default_timer()
         #bot.profiling.print_ms_message((end-start), "Deep copy took")
 
+
+        #Profiling
         self.deep_copy_time_sum = end-start
         self.advance_game_time_sum = 0
         self.bot_time_sum = 0
 
-    def print_test(self):
-        print("from class: " + str(self.test))
+    def get_next_ship_id(self):
+        max_id = 0
+        for player_id in self.game_copy.players:
+            ships_dict = self.game_copy.players[player_id].get_ships_dict()
+            if ships_dict:
+                max_p_id = max(self.game_copy.players[player_id].get_ships_dict())
+                if max_p_id > max_id:
+                    max_id = max_p_id
+        return max_id + 1
+
+    def move(self, position, dx, dy):
+        position.x += dx
+        position.y += dy
+        return position
+
 
     def advance_game(self, commands, player_id):
         # Profiling
         start = timeit.default_timer()
 
         player = self.game_copy.players[player_id]
-        #logging.info("Commands: " + str(len(commands)))
+        # logging.info("Commands: " + str(len(commands)))
         for command in commands:
-            if command == "g":
-                #logging.info("Spawn ship")
-                # GET MAX ID
-                max_id = 0
-                for player_id in self.game_copy.players:
-                    for ship in self.game_copy.players[player_id].get_ships():
-                        if ship.id > max_id:
-                            max_id = ship.id
-                max_id = max_id + 1
-                new_ship = Ship(player.id, max_id , player.shipyard.position, 0)
-                #print("len before: " + str(len(self.game_copy.players[player_id].get_ships())))
-                player._ships[max_id] = new_ship
-                self.game_copy.players[player_id] = player
-                #print("len after: " + str(len(self.game_copy.players[player_id].get_ships())))
-                #player._update(len(player.get_ships())+1, len(player.get_dropoffs()), player.halite_amount)
+            split_command = command.split(" ")
+            # SPAWN COMMAND
+            if split_command[0] == "g":
+                if player.halite_amount >= constants.SHIP_COST:
+                    new_id = self.get_next_ship_id()
+                    new_ship = Ship(player.id, new_id, player.shipyard.position, 0)
+                    # print("len before: " + str(len(self.game_copy.players[player_id].get_ships())))
+                    player.add_ship(new_ship, new_id)
+                    player.halite_amount -= constants.SHIP_COST
+                    self.game_copy.players[player_id] = player
+                    # print("len after: " + str(len(self.game_copy.players[player_id].get_ships())))
+                    # player._update(len(player.get_ships())+1, len(player.get_dropoffs()), player.halite_amount)
+                else:
+                    logging.warning("Player "+str(player_id)+" wanted to build ship, but doesn't have enough halite")
+            # MOVE COMMAND
+            elif split_command[0] == "m":
+                ship_id = int(split_command[1])
+                if self.game_copy.players[player_id].has_ship(ship_id):
+                    ship_to_move = self.game_copy.players[player_id].get_ships_dict()[ship_id]
+                    current_cell = self.game_copy.game_map[ship_to_move.position]
+                    ship_position = ship_to_move.position
+                    ship_halite = ship_to_move.halite_amount
+
+                    failed_to_move = False
+                    # IF NOT STAY STILL
+                    if split_command[2] != "o":
+                        move_cost = constants.MOVE_COST_RATIO * current_cell.halite_amount
+
+                        # IF HAVE ENOUGH TO MOVE
+                        if ship_halite >= move_cost:
+                            if not current_cell.occupied_this_round:
+                                current_cell.ship = None
+                                self.game_copy.game_map[ship_to_move.position] = current_cell
+                            ship_halite -= move_cost
+                            if split_command[2] == "n":
+                                ship_position = self.move(ship_position, 1, 0)
+                            elif split_command[2] == "s":
+                                ship_position = self.move(ship_position, -1, 0)
+                            elif split_command[2] == "e":
+                                ship_position = self.move(ship_position, 0, 1)
+                            elif split_command[2] == "w":
+                                ship_position = self.move(ship_position, 0, -1)
+
+                            ship_to_move.position = ship_position
+                            ship_to_move.halite_amount = ship_halite
+
+                            next_cell = self.game_copy.game_map[ship_to_move.position]
+                            # Check for collision
+                            if next_cell.occupied_this_round:
+                                # Destroy both ships
+                                logging.warning("Ship "+str(ship_id) + ", owned by " + str(
+                                    player_id) + "Collided ")
+                                self.game_copy.players[player_id].remove_ship(ship_id)
+                                if next_cell.ship is not None:
+                                    self.game_copy.players[next_cell.ship.owner].remove_ship(next_cell.ship.id)
+                                    next_cell.ship = None
+                            else:
+                                next_cell.ship = ship_to_move
+                            next_cell.occupied_this_round = True
+                            self.game_copy.game_map[ship_to_move.position] = next_cell
+
+
+                        else:
+                            failed_to_move = True
+                            logging.warning(
+                                "Player " + str(player_id) + " wanted to move ship " + str(
+                                    ship_id) + ", but doesn't have enough halite")
+                    if split_command[2] == "o" or failed_to_move:
+                        gather_amount = constants.EXTRACT_RATIO * current_cell.halite_amount
+                        ship_halite += gather_amount
+                        ship_to_move.halite_amount = ship_halite
+                        current_cell.halite_amount -= gather_amount
+                        self.game_copy.game_map[ship_to_move.position].halite_amount = current_cell.halite_amount
+                else:
+                    logging.warning(
+                        "Player " + str(player_id) + " wanted to move ship "+str(ship_id)+", but doesn't have it")
+                    logging.warning(str(self.game_copy.players[player_id].get_ships_dict()))
+                #print("move")
+
+            elif split_command[0] == "c":
+                # TODO implement consturc dropoff
+                print("Make dropoff")
 
         # Profiling
         end = timeit.default_timer()
-        #bot.profiling.print_ms_message((end-start), "Advance game took")
-        self.advance_game_time_sum = self.advance_game_time_sum + (end-start)
+        # bot.profiling.print_ms_message((end-start), "Advance game took")
+        # TODO clean up map
 
+        self.advance_game_time_sum = self.advance_game_time_sum + (end-start)
     def run_simulation(self, bot):
         while self.game_copy.turn_number < 500:
-            #print("Turn " + str(self.game_copy.turn_number))
+            # print("Turn " + str(self.game_copy.turn_number))
             logging.info("+++++++++ TURN {:03} +++++++++ :SIM".format(self.game_copy.turn_number))
             # Profiling
             start = timeit.default_timer()

@@ -14,6 +14,7 @@ class MapCell:
         self.halite_amount = halite_amount
         self.ship = None
         self.structure = None
+        self.occupied_this_round = False
 
     @property
     def is_empty(self):
