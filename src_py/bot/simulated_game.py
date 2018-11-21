@@ -55,8 +55,12 @@ class GameSimulator:
         return position
 
     def clean_map(self):
-        for index, cell in self.game_copy.game_map._cells:
-            self.game_copy.game_map._cells[index].occupied_this_round = False
+        #print("LEN: "+str(len(self.game_copy.game_map._cells[0])))
+        for i in range(len(self.game_copy.game_map._cells)+1):
+            for j in range(len(self.game_copy.game_map._cells[0])+1):
+                self.game_copy.game_map._cells[i+1][j+1].occupied_this_round = False
+        #for index, cell in self.game_copy.game_map._cells:
+        #    self.game_copy.game_map._cells[index].occupied_this_round = False
 
     def advance_game(self, commands, player_id):
         # Profiling
