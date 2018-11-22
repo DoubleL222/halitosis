@@ -62,6 +62,7 @@ class GameSimulator:
         for i in range(len(self.game_copy.game_map._cells)):
             for j in range(len(self.game_copy.game_map._cells[i])):
                 #logging.info("i: "+str(i)+"; j: "+str(j))
+                #logging.info("i: "+str(i)+ ", Max i: "+str(len(self.game_copy.game_map._cells))+" j: "+str(j) + ", Max j: "+str(len(self.game_copy.game_map._cells[i])))
                 self.game_copy.game_map._cells[i][j].occupied_this_round = False
 
         #for index, cell in self.game_copy.game_map._cells:
