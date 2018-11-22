@@ -10,26 +10,42 @@
 #include <random>
 #include <vector>
 
-class GameClone
-{
-private:
+struct SearchState {
+    bool visited;
+    hlt::Halite halite;
+    std::unordered_map<hlt::Position, hlt::Halite> board_override;
+    hlt::Direction in_direction;
+};
+
+class GameClone {
 	Frame& frame;
-	bool do_prediction;
-	int prediction_steps;
-	hlt::GameMap map;
-	std::unique_ptr<int[]> prediction_map;
-	hlt::Position advance_game_by_step(hlt::Direction dir, hlt::Position current_position);
-	int get_index_from_coordinates(int x, int y, int prediction_step);
-	int get_index_from_cell(hlt::Position map_position, int prediction_step);
+    std::vector<hlt::Halite> halite;
+    // Used to mark cells as unsafe once a certain number of turns has passed.
+    std::vector<int> turns_until_occupation;
+    std::vector<hlt::PlayerId> structures;
 
 public:
-	hlt::GameMap& get_map();
-	// use this to check if cell will be occupied
-	// prediction_step is how many turns in the future we're looking in ( 0 = current turn)
-	bool is_cell_occupied(int x, int y, int prediction_step);
-	bool is_cell_occupied(hlt::Position map_position, int prediction_step);
-	GameClone(Frame & frame);
-	GameClone(Frame & frame, bool do_prediction, int prediction_steps);
-	std::vector<hlt::Position> advance_game(Plan & plan, hlt::Ship & ship);
-	std::string print_prediction();
+	GameClone(Frame& frame);
+	void advance_game(Plan& plan, hlt::Ship& ship);
+
+    OptimalPath get_optimal_path(
+        hlt::Ship& ship,
+        hlt::Position end,
+        time_point end_time,
+        unsigned int max_depth,
+        // Number of turns in which ships should stay closest to own shipyard.
+        unsigned int defensive_turns) const;
+
+    int width() const;
+    int height() const;
+    hlt::Halite get_halite(hlt::Position pos) const;
+    bool has_structure(hlt::Position pos) const;
+
+private:
+    SearchPath get_search_path(
+        SearchState* search_state,
+        hlt::Position start,
+        hlt::Position end,
+        int max_depth
+    ) const;
 };

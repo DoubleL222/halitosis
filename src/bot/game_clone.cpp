@@ -1,149 +1,210 @@
 #include "game_clone.hpp"
 
-hlt::GameMap& GameClone::get_map()
+GameClone::GameClone(Frame& frame)
+  : frame(frame),
+    halite(frame.get_board_size()),
+    turns_until_occupation(frame.get_board_size()),
+    structures(frame.get_board_size())
 {
-	return map;
+    auto& map = frame.get_game().game_map;
+
+    turns_until_occupation.assign(frame.get_board_size(), -1);
+    for (int y=0; y < map->height; y++) {
+        for (int x=0; x < map->width; x++) {
+            hlt::Position pos(x, y);
+            halite[frame.get_index(pos)] = map->at(pos)->halite;
+        }
+    }
+
+    for (auto player : frame.get_game().players) {
+        structures[frame.get_index(player->shipyard->position)] = player->id;
+        for (auto pair : player->dropoffs) {
+            structures[frame.get_index(pair.second->position)] = player->id;
+        }
+    }
 }
 
-// use this to check if cell will be occupied
-// prediction_step is how many turns in the future we're looking in ( 0 == current turn)
-bool GameClone::is_cell_occupied(int x, int y, int prediction_step)
-{
-	int index = prediction_step * (map.height * map.width) + (y * map.width) + x;
-	return prediction_map[index];
+void GameClone::advance_game(Plan& plan, hlt::Ship& ship) {
+    auto current_pos = ship.position;
+    auto current_halite = ship.halite;
+
+	for (size_t i = plan.execution_step; i < plan.path.size(); i++) {
+        auto move = plan.path[i].direction;
+        if (move == hlt::Direction::STILL) {
+            auto idx = frame.get_index(current_pos);
+            auto mined_halite = halite[idx]/hlt::constants::EXTRACT_RATIO;
+            auto new_halite = std::min(hlt::constants::MAX_HALITE, current_halite+mined_halite);
+            halite[idx] -= new_halite-current_halite;
+            current_halite = new_halite;
+        }
+        current_pos = frame.move(current_pos, move);
+    }
 }
 
-// use this to check if cell will be occupied
-// prediction_step is how many turns in the future we're looking in ( 0 == current turn)
-bool GameClone::is_cell_occupied(hlt::Position map_position, int prediction_step)
-{
-	int index = prediction_step * (map.height * map.width) + (map_position.y * map.width) + map_position.x;
-	return prediction_map[index];
+SearchPath GameClone::get_search_path(
+    SearchState* search_state,
+    hlt::Position start,
+    hlt::Position end,
+    int max_depth
+) const {
+    SearchPath res(max_depth);
+    hlt::Position current_pos = end;
+    for (int depth=max_depth; depth>0; depth--) {
+        int idx = frame.get_depth_index(depth, current_pos);
+        auto prev_pos = current_pos.directional_offset(
+            hlt::invert_direction(search_state[idx].in_direction));
+        prev_pos = frame.get_game().game_map->normalize(prev_pos);
+        int prev_idx = frame.get_depth_index(depth-1, current_pos);
+
+        res[depth-1] = PathSegment(
+            search_state[idx].in_direction,
+            search_state[prev_idx].halite
+        );
+        current_pos = prev_pos;
+    }
+    return res;
 }
 
-GameClone::GameClone(Frame & frame) : frame(frame)
-{
-	this->map = hlt::GameMap(*frame.get_game().game_map);
-//	this->frame = frame;
-	this->do_prediction = false;
+bool should_update_search(SearchState& cur, hlt::Halite halite, SearchState& best) {
+    if (!best.visited) { return true; }
+    return halite > best.halite;
 }
 
-GameClone::GameClone(Frame& frame, bool do_prediction, int prediction_steps) : frame(frame)
-{
-	this->map = hlt::GameMap(*frame.get_game().game_map);
-	//this->frame = frame;
-	this->do_prediction = do_prediction;
-	this->prediction_steps = prediction_steps;
-	if (do_prediction) 
-	{
-		prediction_map = std::make_unique<int[]>((size_t)(frame.get_game().game_map->height * frame.get_game().game_map->width * prediction_steps));
-		//Make clone of current game state
-		//GameClone game_clone = GameClone(frame->get_game());
+// Find an optimal path to a point for a ship on a specific map.
+OptimalPath GameClone::get_optimal_path(
+    hlt::Ship& ship,
+    hlt::Position end,
+    time_point end_time,
+    unsigned int max_depth,
+    unsigned int defensive_turns
+) const {
+    auto start = ship.position;
+    auto search_state_owned = std::make_unique<SearchState[]>(max_depth*frame.get_board_size());
+    auto search_state = search_state_owned.get();
 
-		////Make future state
-		//for (auto& pair : frame->get_game().me->ships) {
-		//	auto id = pair.first;
-		//	auto& ship = pair.second;
-		//	std::vector<hlt::Position> all_positions = game_clone.advance_game(plans[id], *ship);
+    if (max_depth == 0) {
+        OptimalPath res;
+        res.max_per_turn = get_search_path(search_state, start, end, 0);
+        res.max_total = get_search_path(search_state, start, end, 0);
+        return res;
+    }
 
-		//	int depth = 0;
-		//	for (hlt::Position next_position : all_positions)
-		//	{
-		//		prediction_map[get_index_from_cell(next_position, *frame->get_game().game_map, depth)] = 1;
-		//		depth = depth + 1;
-		//	}
-		//}
-	}
+    int start_idx = frame.get_depth_index(0, start);
+    search_state[start_idx].halite = ship.halite;
+    search_state[start_idx].visited = true;
+    search_state[start_idx].board_override = std::unordered_map<hlt::Position, hlt::Halite>();
+    unsigned int search_depth = 0;
+    for (
+        auto now = ms_clock::now();
+        search_depth < max_depth-1 && now < end_time;
+        now = ms_clock::now(), search_depth++
+    ) {
+        unsigned int current_turn = frame.get_game().turn_number+search_depth;
+        int search_dist_x = std::min(search_depth, static_cast<unsigned int>(width())/2);
+        int search_dist_y = std::min(search_depth, static_cast<unsigned int>(height())/2);
+        for (int dy=-search_dist_y; dy <= search_dist_y; dy++) {
+            for (int dx=-search_dist_x; dx <= search_dist_x; dx++) {
+                auto pos = frame.move(start, dx, dy);
+                int cur_idx = frame.get_depth_index(search_depth, pos);
+                if (!search_state[cur_idx].visited) { continue; }
+
+                auto current_halite = search_state[cur_idx].halite;
+
+                int sea_halite = search_state[cur_idx].board_override.count(pos)
+                    ? search_state[cur_idx].board_override[pos]
+                    : get_halite(pos);
+                auto halite_after_move = current_halite-std::ceil(sea_halite*0.1);
+                auto halite_after_gather = current_halite;
+                if (!has_structure(pos)) {
+                    halite_after_gather += (hlt::Halite)std::ceil(sea_halite*0.25);
+                    halite_after_gather = std::min(halite_after_gather, hlt::constants::MAX_HALITE);
+                }
+
+                // Movement
+                if (halite_after_move >= 0) {
+                    for (auto direction : hlt::ALL_CARDINALS) {
+                        auto new_pos = frame.move(pos, direction);
+                        auto my_id = frame.get_game().my_id;
+                        bool defensive_move = (frame.get_closest_shipyard(new_pos) == my_id);
+                        if (current_turn >= defensive_turns || defensive_move) {
+                            int new_idx = frame.get_depth_index(search_depth+1, new_pos);
+
+                            bool update = should_update_search(
+                                search_state[cur_idx],
+                                halite_after_move,
+                                search_state[new_idx]);
+                            if (update) {
+                                search_state[new_idx].board_override
+                                    = search_state[cur_idx].board_override;
+                                search_state[new_idx].in_direction = direction;
+                                search_state[new_idx].visited = true;
+                                search_state[new_idx].halite = halite_after_move;
+                            }
+                        }
+                    }
+                }
+                // Gathering
+                int new_idx = frame.get_depth_index(search_depth+1, pos);
+                bool update = should_update_search(
+                    search_state[cur_idx],
+                    halite_after_gather,
+                    search_state[new_idx]);
+                if (update) {
+                    std::unordered_map<hlt::Position, hlt::Halite> new_override(
+                        search_state[cur_idx].board_override
+                    );
+                    new_override[pos] =
+                        sea_halite-(halite_after_gather-current_halite);
+
+                    search_state[new_idx].halite = halite_after_gather;
+                    search_state[new_idx].board_override = new_override;
+                    search_state[new_idx].in_direction = hlt::Direction::STILL;
+                    search_state[new_idx].visited = true;
+                }
+            }
+        }
+    }
+
+    int best_per_turn_depth = 0;
+    int best_total_depth = 0;
+
+    float best_halite_per_turn = 0;
+    for (unsigned int depth=1; depth < search_depth; depth++) {
+        int idx = frame.get_depth_index(depth, end);
+        float halite_per_turn = ((float)(search_state[idx].halite))/depth;
+        if (halite_per_turn > best_halite_per_turn) {
+            best_halite_per_turn = halite_per_turn;
+            best_per_turn_depth = depth;
+        }
+    }
+    auto best_halite = 0;
+    for (unsigned int depth=1; depth < search_depth; depth++) {
+        int idx = frame.get_depth_index(depth, end);
+        auto total_halite = search_state[idx].halite;
+        if (total_halite > best_halite) {
+            best_halite = total_halite;
+            best_total_depth = depth;
+        }
+    }
+    OptimalPath res;
+    res.max_per_turn = get_search_path(search_state, start, end, best_per_turn_depth);
+    res.max_total = get_search_path(search_state, start, end, best_total_depth);
+    return res;
 }
 
-std::vector<hlt::Position> GameClone::advance_game(Plan & plan, hlt::Ship & ship)
-{
-	std::vector<hlt::Position> all_positions;
-	all_positions.push_back(ship.position);
-	int position_iterator = 0;
-	for (size_t i = plan.execution_step; i < plan.path.size(); i++)
-	{
-		all_positions.push_back(
-            advance_game_by_step(plan.path[i].direction, all_positions[position_iterator]));
-		position_iterator++;
-	}
-
-	if (this->do_prediction) 
-	{
-		int depth = 0;
-		for (hlt::Position next_position : all_positions)
-		{
-			prediction_map[get_index_from_cell(next_position, depth)] = 1;
-			depth = depth + 1;
-		}
-	}
-
-	return all_positions;
+int GameClone::width() const {
+    return frame.get_game().game_map->width;
 }
 
-hlt::Position GameClone::advance_game_by_step(hlt::Direction dir, hlt::Position current_position)
-{
-	hlt::MapCell * ship_cell;
-	hlt::MapCell * next_cell;
-
-	ship_cell = map.at(current_position);
-
-	if (dir == hlt::Direction::STILL)
-	{
-		//Mine The Cell
-		ship_cell->halite = ship_cell->halite * 0.75f;
-
-		return ship_cell->position;
-	}
-	else
-	{
-		//move
-		hlt::Position next_pos = frame.move(current_position, dir);
-		next_cell = map.at(next_pos);
-		//next_cell->ship = ship_cell->ship;
-		//ship_cell->ship = nullptr;
-
-		return next_cell->position;
-	}
+int GameClone::height() const {
+    return frame.get_game().game_map->height;
 }
 
-int GameClone::get_index_from_coordinates(int x, int y, int prediction_step)
-{
-	int index = prediction_step * (map.height * map.width) + (y * map.width) + x;
-	return index;
+hlt::Halite GameClone::get_halite(hlt::Position pos) const {
+    return halite[frame.get_index(pos)];
 }
 
-int GameClone::get_index_from_cell(hlt::Position map_position, int prediction_step)
-{
-	int index = prediction_step * (map.height * map.width) + (map_position.y * map.width) + map_position.x;
-	return index;
+bool GameClone::has_structure(hlt::Position pos) const {
+    return structures[frame.get_index(pos)];
 }
 
-std::string GameClone::print_prediction()
-{
-	std::string print_string;
-	print_string += "PRINT PREDICTION: \n";
-	//for (int p = 0; p < prediction_steps; p++) 
-	for (int p = 0; p < 10; p++)
-	{
-		print_string += "    0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 \n";
-		for (int y = 0; y<map.height; y++)
-		{
-			print_string += std::to_string(y);
-			if (y < 10)
-			{
-				print_string += " ";
-			}
-			print_string += ": ";
-			for (int x = 0; x<map.width; x++)
-			{
-				print_string += std::to_string(prediction_map[get_index_from_coordinates(x, y, p)]);
-				print_string += "  ";
-				//print_string += prediction_map[get_index_from_coordinates(x, y, p)];
-			}
-			print_string += "\n";
-		}
-		print_string += "\n \n Prediction: \n";
-	}
-	return print_string;
-}

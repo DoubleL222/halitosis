@@ -52,15 +52,6 @@ public:
     hlt::Position move(hlt::Position pos, int direction_x, int direction_y);
     hlt::Position move(hlt::Position pos, hlt::Direction direction);
 
-    OptimalPath get_optimal_path(
-        hlt::GameMap& map,
-        hlt::Ship& ship,
-        hlt::Position end,
-        time_point end_time,
-        unsigned int max_depth,
-        // Number of turns in which ships should stay closest to own shipyard.
-        unsigned int defensive_turns);
-
     // Find the cell with the highest halite/distance.
     hlt::Position find_close_halite(hlt::GameMap& map, hlt::Position start);
 
@@ -91,6 +82,7 @@ public:
     // Converts a position to an index in the grid when stored as a row-order matrix.
     int get_index(hlt::Position pos) const;
 
+    int get_depth_index(int depth, hlt::Position pos) const;
 private:
     hlt::Position indexToPosition(int idx);
 };
