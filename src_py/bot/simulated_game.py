@@ -29,6 +29,7 @@ class GameSimulator:
             self.game_copy = copy.deepcopy(game_to_copy)
             self.game_copy.players = copy.deepcopy(game_to_copy.players)
 
+        #logging.info(self.game_copy.game_map._cells)
         # Profiling
         end = timeit.default_timer()
         #bot.profiling.print_ms_message((end-start), "Deep copy took")
@@ -55,10 +56,14 @@ class GameSimulator:
         return position
 
     def clean_map(self):
+        #logging.info(self.game_copy.game_map._cells)
         #print("LEN: "+str(len(self.game_copy.game_map._cells[0])))
-        for i in range(len(self.game_copy.game_map._cells)+1):
-            for j in range(len(self.game_copy.game_map._cells[0])+1):
-                self.game_copy.game_map._cells[i+1][j+1].occupied_this_round = False
+        logging.info("x: " + str(len(self.game_copy.game_map._cells)) + "; y: " + str(len(self.game_copy.game_map._cells[0])))
+        for i in range(len(self.game_copy.game_map._cells)):
+            for j in range(len(self.game_copy.game_map._cells[i])):
+                #logging.info("i: "+str(i)+"; j: "+str(j))
+                self.game_copy.game_map._cells[i][j].occupied_this_round = False
+
         #for index, cell in self.game_copy.game_map._cells:
         #    self.game_copy.game_map._cells[index].occupied_this_round = False
 
@@ -95,8 +100,8 @@ class GameSimulator:
                     failed_to_move = False
                     # IF NOT STAY STILL
                     if split_command[2] != "o":
-                        move_cost = constants.MOVE_COST_RATIO * current_cell.halite_amount
-
+                        move_cost = int(round((1/constants.MOVE_COST_RATIO) * current_cell.halite_amount))
+                        logging.warning("Move costs: "+str(move_cost)+ "; Move Cost Ratio: "+str(constants.MOVE_COST_RATIO) + "; Extract ratio: "+str(constants.EXTRACT_RATIO))
                         # IF HAVE ENOUGH TO MOVE
                         if ship_halite >= move_cost:
                             if not current_cell.occupied_this_round:
@@ -136,15 +141,17 @@ class GameSimulator:
 
                         else:
                             failed_to_move = True
+                            logging.warning(str(ship_id) +" has "+ str(ship_to_move.halite_amount))
                             logging.warning(
                                 "Player " + str(player_id) + " wanted to move ship " + str(
                                     ship_id) + ", but doesn't have enough halite")
                     if split_command[2] == "o" or failed_to_move:
-                        gather_amount = constants.EXTRACT_RATIO * current_cell.halite_amount
+                        gather_amount = int(round((1/constants.EXTRACT_RATIO) * current_cell.halite_amount))
                         ship_halite += gather_amount
                         ship_to_move.halite_amount = ship_halite
                         current_cell.halite_amount -= gather_amount
                         self.game_copy.game_map[ship_to_move.position].halite_amount = current_cell.halite_amount
+                        self.game_copy.players[player_id].add_ship(ship_to_move, ship_to_move.id)
                 else:
                     logging.warning(
                         "Player " + str(player_id) + " wanted to move ship "+str(ship_id)+", but doesn't have it")
