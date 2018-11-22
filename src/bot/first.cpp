@@ -27,23 +27,14 @@ const float SHIP_BUILD_FACTOR = 0.5;
 
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_time) {
     Frame frame(game);
+    auto player = game.me;
+
 	//Make game clone
-	GameClone game_clone(frame, true, MAX_SEARCH_DEPTH);
-
-    auto player = frame.get_game().me;
-
-    std::vector<hlt::Command> commands;
-
-	//Updating clone map
+	GameClone game_clone(frame);
 	for (auto& pair : player->ships) {
 		auto& ship = pair.second;
 		game_clone.advance_game(plans[ship->id], *ship);
 	}
-
-    bool spawn_desired = false;
-    if (player->halite >= 1000 && should_build_ship) {
-        spawn_desired = true;
-    }
 
     std::unordered_map<hlt::EntityId, hlt::Direction> moves;
     int num_finished_plans = 0;
@@ -67,8 +58,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
             auto now = ms_clock::now();
             unsigned int defensive_turns = (game.players.size() == 4 ? 150 : 0);
             //Make path on the map clone
-            auto path = frame.get_optimal_path(
-                game_clone.get_map(),
+            auto path = game_clone.get_optimal_path(
                 *ship,
                 player->shipyard->position,
                 now+time_per_plan,
@@ -95,9 +85,17 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
     if (game.players.size() == 4) {
         frame.avoid_enemy_collisions(moves);
     }
+
+    // Whether to attempt to build a ship.
+    bool spawn_desired = false;
+    if (player->halite >= 1000 && should_build_ship) {
+        spawn_desired = true;
+    }
+
     //Collision avoidance,
     auto collision_res = frame.avoid_collisions(moves, turns_left < 15, spawn_desired);
 
+    std::vector<hlt::Command> commands;
     // Find moves for each ship, avoiding collisions.
     for (auto& pair : player->ships) {
         auto id = pair.first;
