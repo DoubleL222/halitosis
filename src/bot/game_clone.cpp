@@ -41,6 +41,10 @@ void GameClone::advance_game(Plan& plan, hlt::Ship& ship) {
     }
 }
 
+void GameClone::set_occupied(hlt::Position pos, int turns) {
+    turns_until_occupation[frame.get_index(pos)] = turns;
+}
+
 SearchPath GameClone::get_search_path(
     SearchState* search_state,
     hlt::Position start,
@@ -110,9 +114,14 @@ OptimalPath GameClone::get_optimal_path(
 
                 auto current_halite = search_state[cur_idx].halite;
 
-                int sea_halite = search_state[cur_idx].board_override.count(pos)
-                    ? search_state[cur_idx].board_override[pos]
-                    : get_halite(pos);
+                int sea_halite = 0;
+                if (!is_occupied(pos, search_depth)) {
+                    if (search_state[cur_idx].board_override.count(pos)) {
+                        sea_halite = search_state[cur_idx].board_override[pos];
+                    } else {
+                        sea_halite = get_halite(pos);
+                    }
+                }
                 auto halite_after_move = current_halite-std::ceil(sea_halite*0.1);
                 auto halite_after_gather = current_halite;
                 if (!has_structure(pos)) {
@@ -206,5 +215,10 @@ hlt::Halite GameClone::get_halite(hlt::Position pos) const {
 
 bool GameClone::has_structure(hlt::Position pos) const {
     return structures[frame.get_index(pos)];
+}
+
+bool GameClone::is_occupied(hlt::Position pos, int depth) const {
+    auto idx = frame.get_index(pos);
+    return turns_until_occupation[idx] != -1 && turns_until_occupation[idx] <= depth;
 }
 

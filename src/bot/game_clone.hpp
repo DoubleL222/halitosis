@@ -36,10 +36,15 @@ public:
         // Number of turns in which ships should stay closest to own shipyard.
         unsigned int defensive_turns) const;
 
+    // Set that the given position will have all halite removed after a specified number of turns.
+    void set_occupied(hlt::Position pos, int turns);
+
     int width() const;
     int height() const;
     hlt::Halite get_halite(hlt::Position pos) const;
     bool has_structure(hlt::Position pos) const;
+    // Check whether the cell has been occupied after the given number of turns.
+    bool is_occupied(hlt::Position pos, int depth) const;
 
 private:
     SearchPath get_search_path(

@@ -35,6 +35,15 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
 		auto& ship = pair.second;
 		game_clone.advance_game(plans[ship->id], *ship);
 	}
+    for (auto other_player : game.players) {
+        if (other_player->id != player->id) {
+            for (auto ship : other_player->ships) {
+                auto simulated_target = frame.find_close_halite(*game.game_map, ship.second->position);
+                auto dist = game.game_map->calculate_distance(ship.second->position, simulated_target);
+                game_clone.set_occupied(simulated_target, dist);
+            }
+        }
+    }
 
     std::unordered_map<hlt::EntityId, hlt::Direction> moves;
     int num_finished_plans = 0;
