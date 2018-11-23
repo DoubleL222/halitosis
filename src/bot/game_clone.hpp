@@ -46,6 +46,9 @@ public:
     // Check whether the cell has been occupied after the given number of turns.
     bool is_occupied(hlt::Position pos, int depth) const;
 
+    // Find the cell with the highest halite/distance.
+    hlt::Position find_close_halite(hlt::Position start);
+
 private:
     SearchPath get_search_path(
         SearchState* search_state,

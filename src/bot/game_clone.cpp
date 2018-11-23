@@ -1,5 +1,7 @@
 #include "game_clone.hpp"
 
+#include <queue>
+
 GameClone::GameClone(Frame& frame)
   : frame(frame),
     halite(frame.get_board_size()),
@@ -222,3 +224,36 @@ bool GameClone::is_occupied(hlt::Position pos, int depth) const {
     return turns_until_occupation[idx] != -1 && turns_until_occupation[idx] <= depth;
 }
 
+hlt::Position GameClone::find_close_halite(hlt::Position start) {
+    auto visited = std::vector<bool>(frame.get_board_size());
+
+    hlt::Position best(0, 0);
+    float best_per_turn = 0;
+
+    std::queue<hlt::Position> queue;
+    queue.push(start);
+    while (!queue.empty()) {
+        auto pos = queue.front();
+        queue.pop();
+
+        auto idx = frame.get_index(pos);
+        if (!visited[idx]) {
+            visited[idx] = true;
+            auto dist = frame.get_game().game_map->calculate_distance(start, pos);
+            float halite = 0;
+            // Set to high value, as opponents ships should not compete amongst themselves
+            if (is_occupied(pos, 200)) {
+                halite = get_halite(pos);
+            }
+            auto per_turn = halite/dist;
+            if (per_turn > best_per_turn) {
+                best_per_turn = per_turn;
+                best = pos;
+            }
+            for (auto dir : hlt::ALL_CARDINALS) {
+                queue.push(frame.move(pos, dir));
+            }
+        }
+    }
+    return best;
+}

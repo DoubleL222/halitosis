@@ -52,9 +52,6 @@ public:
     hlt::Position move(hlt::Position pos, int direction_x, int direction_y);
     hlt::Position move(hlt::Position pos, hlt::Direction direction);
 
-    // Find the cell with the highest halite/distance.
-    hlt::Position find_close_halite(hlt::GameMap& map, hlt::Position start);
-
     hlt::PlayerId get_closest_shipyard(hlt::Position pos);
 
 	//Direct path

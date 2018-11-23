@@ -38,7 +38,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
     for (auto other_player : game.players) {
         if (other_player->id != player->id) {
             for (auto ship : other_player->ships) {
-                auto simulated_target = frame.find_close_halite(*game.game_map, ship.second->position);
+                auto simulated_target = game_clone.find_close_halite(ship.second->position);
                 auto dist = game.game_map->calculate_distance(ship.second->position, simulated_target);
                 game_clone.set_occupied(simulated_target, dist);
             }
