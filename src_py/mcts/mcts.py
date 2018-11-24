@@ -9,31 +9,32 @@ import time
 
 ship_commands = {'n', 's', 'e', 'w', 'o', 'c'}
 
+
 class TreeNode:
 
     def __init__(self, state, parent):
         self.state = state
-        self.isGameOver = state.isGameOver()
-        self.isFullyExpanded = self.isGameOver
+        self.isTerminal = state.isTerminal()
+        self.isFullyExpanded = self.isTerminal
         self.parent = parent
         self.numVisits = 0
         self.totalReward = 0
         self.children = {}
-        self.untried_actions = {'g'}
-        # Fill untried_actions
-        player = state.players[state.my_id]
-        ships = player.get_ships()
+        self.untried_actions = {}
 
-        for ship in ships:
-            for command in ship_commands:
-                self.untried_actions.add(str(ship.id) + "||" + str(command))
+        for command in ship_commands:
+            self.untried_actions.add(str(command))
 
     def get_untried_action(self):
         if self.untried_actions.__len__() == 1:
             self.isFullyExpanded = True
         return self.untried_actions.pop()
 
+
 class Mcts:
+
+
+
     def default_policy_fn(self, state):
         return state.getReward()
 
