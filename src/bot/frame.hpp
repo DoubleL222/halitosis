@@ -38,9 +38,11 @@ struct SpawnRes {
 // A wrapper around the game with helper methods for the current frame of the game.
 class Frame {
     const hlt::Game& game;
+    std::unordered_map<hlt::EntityId, hlt::Direction> last_moves;
 
 public:
     Frame(const hlt::Game& game);
+    Frame(const hlt::Game& game, std::unordered_map<hlt::EntityId, hlt::Position>& previous_positions);
 
 	enum class DistanceMeasure : char {
 		EUCLIDEAN = 'e',

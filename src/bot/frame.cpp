@@ -21,6 +21,28 @@ PathSegment::PathSegment(hlt::Direction direction, hlt::Halite halite)
 
 Frame::Frame(const hlt::Game& game) : game(game) {}
 
+Frame::Frame(
+    const hlt::Game& game,
+    std::unordered_map<hlt::EntityId, hlt::Position>& previous_positions
+) : game(game) {
+    for (auto player : game.players) {
+        for (auto pair : player->ships) {
+            auto ship = pair.second;
+            if (previous_positions.count(ship->id)) {
+                for (auto dir : ALL_DIRECTIONS) {
+                    auto new_pos = move(previous_positions.at(ship->id), dir);
+                    if (new_pos == ship->position) {
+                        last_moves[ship->id] = dir;
+                    }
+                }
+            } else {
+                last_moves[ship->id] = hlt::Direction::STILL;
+            }
+            previous_positions.insert( { ship->id, ship->position } );
+        }
+    }
+}
+
 const hlt::Game& Frame::get_game() const {
     return game;
 }
@@ -232,11 +254,22 @@ void Frame::ensure_moves_possible(std::unordered_map<hlt::EntityId, hlt::Directi
 }
 
 void Frame::avoid_enemy_collisions(std::unordered_map<hlt::EntityId, hlt::Direction>& moves) {
+    std::vector<bool> enemy_ship_possible(get_board_size());
+    for (auto player : game.players) {
+        if (player->id != game.my_id) {
+            for (auto pair : player->ships) {
+                auto ship = pair.second;
+                //enemy_ship_possible[get_index(ship->position)] = true;
+                auto assumed_position = move(ship->position, last_moves[ship->id]);
+                enemy_ship_possible[get_index(assumed_position)] = true;
+            }
+        }
+    }
+
     for (auto p : game.me->ships) {
         auto ship = p.second;
         auto destination = move(ship->position, moves[ship->id]);
-        auto destination_ship = game.game_map->at(destination)->ship;
-        if (destination_ship && destination_ship->owner != game.my_id) {
+        if (enemy_ship_possible.at(get_index(destination))) {
             moves[ship->id] = hlt::Direction::STILL;
         }
     }

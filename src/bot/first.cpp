@@ -118,5 +118,16 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
     if (collision_res.is_spawn_possible) {
         commands.push_back(player->shipyard->spawn());
     }
+
+    update_previous_positions(game);
     return commands;
+}
+
+void FirstBot::update_previous_positions(const hlt::Game& game) {
+    for (auto player : game.players) {
+        for (auto pair : player->ships) {
+            auto ship = pair.second;
+            previous_positions.insert( { ship->id, ship->position } );
+        }
+    }
 }
