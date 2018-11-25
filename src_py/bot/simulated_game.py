@@ -40,6 +40,18 @@ class GameSimulator:
         self.advance_game_time_sum = 0
         self.bot_time_sum = 0
 
+    def print_map(self):
+        print_string = "\n"
+        for i in range(len(self.game_copy.game_map._cells)):
+            for j in range(len(self.game_copy.game_map._cells[i])):
+                map_cell = self.game_copy.game_map._cells[i][j]
+                print_string += "h: " + str(map_cell.halite_amount)
+                if map_cell.ship is not None:
+                    print_string += ", s: " + str(map_cell.ship.halite_amount)
+                print_string+= " || "
+            print_string += "\n"
+        logging.info(print_string)
+
     def get_next_ship_id(self):
         max_id = 0
         for player_id in self.game_copy.players:
@@ -170,7 +182,8 @@ class GameSimulator:
         self.clean_map()
         self.advance_game_time_sum = self.advance_game_time_sum + (end-start)
     def run_simulation(self, bot):
-        while self.game_copy.turn_number < 500:
+        while self.game_copy.turn_number < 20:
+            self.print_map()
             # print("Turn " + str(self.game_copy.turn_number))
             logging.info("+++++++++ TURN {:03} +++++++++ :SIM".format(self.game_copy.turn_number))
             # Profiling
