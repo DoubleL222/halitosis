@@ -14,7 +14,7 @@ class MapCell:
         self.halite_amount = halite_amount
         self.ship = None
         self.structure = None
-        self.occupied_this_round = False
+        self.ship_queue = []
 
     @property
     def is_empty(self):
@@ -86,6 +86,45 @@ class GameMap:
         elif isinstance(location, Entity):
             return self._cells[location.position.y][location.position.x]
         return None
+
+    def get_cells(self):
+        return self._cells
+
+    def set_cell_halite(self, i, j, new_halite_amount):
+        self._cells[i][j].halite_amount = new_halite_amount
+
+    def set_cell_halite(self, position, new_halite_amount):
+        self._cells[position].halite_amount = new_halite_amount
+
+    def add_ship_to_cell(self, i, j, ship):
+        self._cells[i][j].ship = ship
+
+    def add_ship_to_cell(self, position, ship):
+        self._cells[position].ship = ship
+
+    def remove_ship_from_cell(self, i, j):
+        self._cells[i][j].ship = None
+
+    def remove_ship_from_cell(self, position):
+        self._cells[position].ship = None
+
+    def add_ship_to_cell_queue(self, i, j, ship):
+        self._cells[i][j].ship_queue.append(ship)
+
+    def add_ship_to_cell_queue(self, position, ship):
+        self._cells[position].ship_queue.append(ship)
+
+    def add_cell_halite(self, i, j, halite_to_add):
+        self._cells[i][j].halite_amount += halite_to_add
+
+    def add_cell_halite(self, position, halite_to_add):
+        self._cells[position].halite_amount += halite_to_add
+
+    def clear_ship_queue(self, i, j):
+        self._cells[i][j].ship_queue = []
+
+    def clear_ship_queue(self, position):
+        self._cells[position].ship_queue = []
 
     def calculate_distance(self, source, target):
         """

@@ -61,6 +61,18 @@ class Player:
         if ship_id in self._ships:
             del self._ships[ship_id]
 
+    def add_ship_halite(self, ship_id, halite_to_add):
+        self._ships[ship_id].halite_amount += halite_to_add
+
+    def set_ship_halite(self, ship_id, halite_to_set):
+        self._ships[ship_id].halite_amount = halite_to_set
+
+    def add_player_halite(self, halite_to_add):
+        self.halite_amount += halite_to_add
+
+    def change_ship_position(self, ship_id, new_position):
+        self._ships[ship_id].position = new_position
+
     def has_ship(self, ship_id):
         """
         Check whether the player has a ship with a given ID.
