@@ -47,6 +47,10 @@ while True:
     #   end of the turn.
     command_queue = []
 
+    # --------------------------------------------------------
+    # Random Movement - START
+    # --------------------------------------------------------
+
     # for ship in me.get_ships():
     #     # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
     #     #   Else, collect halite.
@@ -57,6 +61,23 @@ while True:
     #     else:
     #         command_queue.append(ship.stay_still())
 
+    # --------------------------------------------------------
+    # Random Movement - END
+    # --------------------------------------------------------
+
+    # --------------------------------------------------------
+    # MCTS - START
+    # --------------------------------------------------------
+
+    # Settings for MCTS runs.
+    # Timestamp = current time + time limit (all values are in seconds and are floats)
+    do_merged_simulations = False
+    use_best_action_list_for_other_ships = True
+    max_iterations = 100
+    num_iterations_done = 0
+    time_limit = time.time() + 1.0
+    last_iteration_time = 0.0
+
     # Reset best action lists
     mcts.Mcts.ship_best_action_lists = {}
 
@@ -64,13 +85,11 @@ while True:
     mcts_runners = []
     for ship in me.get_ships():
         mcts_runners.append(mcts.Mcts(ship_id=ship.id, game_state=game, current_turn=game.turn_number,
-                                      game_max_turns=constants.MAX_TURNS))
+                                      game_max_turns=constants.MAX_TURNS,
+                                      do_merged_simulations=do_merged_simulations,
+                                      use_best_action_list_for_other_ships=use_best_action_list_for_other_ships,
+                                      simulator=simulator))
 
-    # Timestamp = current time + time limit (all values are in seconds and are floats)
-    max_iterations = 100
-    num_iterations_done = 0
-    time_limit = time.time() + 1.0
-    last_iteration_time = 0.0
     while True:
         iteration_start_time = time.time()
         # Use last iteration's time spent, to approximate the amount of time we would spend on the next iteration,
@@ -81,6 +100,23 @@ while True:
         for mcts_runner in mcts_runners:
             mcts_runner.do_one_uct_update()
 
+        if not do_merged_simulations:
+            for action in mcts.Mcts.ship_commands:
+                ship_action_lists = {}
+                for mcts_runner in mcts_runners:
+                    ship_action_lists[mcts_runner.shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
+
+                rewards = mcts.Mcts.do_simulation(simulator, ship_action_lists)
+
+                for mcts_runner in mcts_runners:
+                    child_node = mcts_runner.lastGeneratedChildren.my_dict.pop(action, None)
+                    if child_node is not None:
+                        child_node.totalReward = rewards[mcts_runner.shipId]
+                        mcts_runner.backpropagate(child_node, child_node.totalReward)
+
+            for mcts_runner in mcts_runners:
+                mcts_runner.update_ship_best_action_list()
+
         last_iteration_time = time.time() - iteration_start_time
         num_iterations_done += 1
         if num_iterations_done >= max_iterations:
@@ -90,13 +126,14 @@ while True:
 
     action_list_dict = mcts.Mcts.ship_best_action_lists
     for ship in me.get_ships():
-        # Debugging stuff
+        # Debugging stuff.
         action_list = action_list_dict[ship.id]
         actions = ""
         for action in action_list:
             actions += action + ", "
         logging.info("Ship " + str(ship.id) + " best action list after update: " + actions)
 
+        # Select an action using the newly updated best ship action lists.
         action = None
         if ship.id in action_list_dict:
             action = action_list_dict[ship.id][0]
@@ -107,6 +144,10 @@ while True:
 
         # Append the chosen action to the command queue.
         command_queue.append(ship.move(action))
+
+    # --------------------------------------------------------
+    # MCTS - END
+    # --------------------------------------------------------
 
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.

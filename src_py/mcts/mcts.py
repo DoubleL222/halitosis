@@ -11,7 +11,6 @@ import logging
 
 
 class TreeNode:
-    ship_commands = {'n', 's', 'e', 'w', 'o'}
 
     def __init__(self, is_terminal=False, depth=0, parent=None, action=None, initial_reward=0):
         self.isTerminal = is_terminal
@@ -23,26 +22,27 @@ class TreeNode:
         self.isFullyExpanded = self.isTerminal
         self.visits = 0
         self.children = []
-        self.untried_actions = copy.deepcopy(self.ship_commands)
-
-    def get_untried_action(self):
-        if self.untried_actions.__len__() == 1:
-            self.isFullyExpanded = True
-        return self.untried_actions.pop()
 
 
 class Mcts:
+    ship_commands = {'n', 's', 'e', 'w', 'o'}
     ship_best_action_lists = {}
 
     # exploration_constant note: Larger values will increase exploitation, smaller will increase exploration.
     def __init__(self, exploration_constant=1 / math.sqrt(2), game_state=None, ship_id=None,
-                 current_turn=1, game_max_turns=1):
+                 current_turn=1, game_max_turns=1, do_merged_simulations=True,
+                 use_best_action_list_for_other_ships=True, simulator=None):
         self.explorationConstant = exploration_constant
         self.rootNode = TreeNode()
         self.shipId = ship_id
         self.currentTurn = current_turn
         self.gameMaxTurns = game_max_turns
         self.gameState = game_state
+        self.doMergedSimulations = do_merged_simulations
+        self.useBestActionListForOtherShips = use_best_action_list_for_other_ships
+        self.simulator = simulator
+        self.lastExpandedNode = None
+        self.lastGeneratedChildren = {}
 
     # function UCTSEARCH(s0)
     #     create root node v0 with state s0
@@ -70,7 +70,7 @@ class Mcts:
     # happens.
     def tree_policy(self):
         node = self.rootNode
-        while not node.isTerminal:
+        while not self.doMergedSimulations or not node.isTerminal:
             if not node.isFullyExpanded:
                 self.expand(node)
                 return
@@ -91,15 +91,23 @@ class Mcts:
     #     return v'
 
     def expand(self, node):
-        # We always expand all possible nodes of a given node immediately, and do backpropagation on all of them.
+        # We always expand all possible nodes of a given node immediately.
         while not node.isFullyExpanded:
-            action = node.get_untried_action()
-            new_node = self.generate_new_node(node, action)
-            node.children.append(new_node)
-            self.backpropagate(new_node, new_node.totalReward)
+            for action in Mcts.ship_commands:
+                new_node = self.generate_new_node(node, action)
+                if self.doMergedSimulations:
+                    rewards = self.do_simulation(self.simulator, self.compile_new_action_lists_for_individual_run(node))
+                    new_node.totalReward = rewards.pop(self.shipId, 0)
+                    self.backpropagate(new_node, new_node.totalReward)
+                else:
+                    self.lastGeneratedChildren[action] = new_node
+                node.children.append(new_node)
+                self.lastExpandedNode = node
 
-        # Update the current best action list in the main dictionary.
-        self.update_ship_best_action_list()
+        # Update the current best action list in the main dictionary, but only after simulating and
+        # backpropagating all the new child nodes.
+        if self.doMergedSimulations:
+            self.update_ship_best_action_list()
         return
 
     # Create a new action list, with the given action as the first action, and using the given parent's action as
@@ -129,22 +137,34 @@ class Mcts:
         return
 
     def generate_new_node(self, parent, action):
-        # Copy the current best action lists for all ships.
-        temp_ship_best_action_lists = copy.deepcopy(self.ship_best_action_lists)
+        # Create a new tree node with 0 reward.
+        return TreeNode(is_terminal=self.currentTurn + parent.depth + 1 >= self.gameMaxTurns, depth=parent.depth+1,
+                        parent=parent, action=action, initial_reward=0)
+
+    def compile_new_action_lists_for_individual_run(self, node):
+        if self.useBestActionListForOtherShips:
+            # Copy the current best action lists for all ships.
+            temp_ship_best_action_lists = copy.deepcopy(self.ship_best_action_lists)
+        else:
+            temp_ship_best_action_lists = {}
 
         # Create a new action list for this ship, with the given action as the first action.
-        new_ship_action_tree = self.get_specific_action_list(action, parent)
+        new_ship_action_tree = self.get_specific_action_list(node.action, node.parent)
 
         # Replace our ship's current action list (in the copy) with our new action list.
         temp_ship_best_action_lists[self.shipId] = new_ship_action_tree
 
+    @staticmethod
+    def do_simulation(simulator, ship_action_lists):
+
         # Do the simulation, using our current game state, and our new action list,
         # as well as the current best actions for the other ships.
-        total_reward = self.do_simulation(temp_ship_best_action_lists)
+        # Call Luka's simulation thingy with the state and the given ship_action_trees,
+        # to receive a reward.
 
-        # Create a new tree node.
-        return TreeNode(is_terminal=self.currentTurn + parent.depth + 1 >= self.gameMaxTurns, depth=parent.depth+1,
-                        parent=parent, action=action, initial_reward=total_reward)
+        # return self.gameState.function_to_call(ship_action_lists)
+        return simulator.function_to_call(ship_action_lists)
+        # return random.randrange(1, 10)
 
     def best_child(self, node):
         best_score = 0.0
@@ -194,11 +214,3 @@ class Mcts:
             node.totalReward += reward
             node = node.parent
         return
-
-    def do_simulation(self, ship_action_trees):
-        # Call Luka's simulation thingy with the state and the given ship_action_trees,
-        # to receive a new state and a reward.
-
-        # return self.gameState.function_to_call(ship_action_trees)
-
-        return random.randrange(1, 10)
