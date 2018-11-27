@@ -23,10 +23,12 @@ class GameSimulator:
     """
     The is a representation of the Game class
     """
-    def __init__(self, game_to_copy, to_search_depth=hlt.constants.MAX_TURNS):
+    def __init__(self, game_to_copy, to_search_depth=-1):
         # Profiling
         start = timeit.default_timer()
 
+        if to_search_depth == -1:
+            to_search_depth = hlt.constants.MAX_TURNS
         # Set search depth for simulation
         self.search_depth = to_search_depth
 
@@ -38,7 +40,8 @@ class GameSimulator:
             self.game_copy.players = copy.deepcopy(game_to_copy.players)
 
         # Setting shipyard position cells halite to 0
-        for curr_player in self.game_copy.players:
+        for curr_player_id in self.game_copy.players:
+            curr_player = self.game_copy.players[curr_player_id]
             self.game_copy.game_map.set_cell_halite(curr_player.shipyard.position, 0)
             # Create ship dictionary for keeping score
             for current_ship in curr_player.get_ships():
@@ -91,21 +94,23 @@ class GameSimulator:
         # Reset necessary map cells members
         for i in range(len(self.game_copy.game_map.get_cells())):
             for j in range(len(self.game_copy.game_map.get_cells()[i])):
-                ship_queue = self.game_copy.game_map[i][j].ship_queue
+                current_cell = self.game_copy.game_map.get_cells()[i][j]
+                ship_queue = self.game_copy.game_map.get_cell_ship_queue(current_cell.position)
                 # If only one ship entering/staying in cell put it there
                 if len(ship_queue) == 1:
-                    self.game_copy.game_map.add_ship_to_cell(i, j, ship_queue[0])
+                    self.game_copy.game_map.add_ship_to_cell(current_cell.position, ship_queue[0])
                 # If more than one ship coming to same cell, destroy all
                 elif len(ship_queue) > 1:
-                    logging.warning("Ships collided on map cell: i: " + str(i) + ", j: " + str(j) + "; ships:")
+                    logging.warning("Ships collided on map cell: i: " + str(current_cell.position.x) + ", j: " + str(current_cell.position.y) + "; ships:")
                     for current_ship in ship_queue:
                         logging.warning("Ship id: " + str(current_ship.id) + ", owner: " + str(current_ship.owner))
                         self.game_copy.players[current_ship.owner].remove_ship(current_ship.id)
                 # Clear ship queue for cell
-                self.game_copy.game_map.clear_ship_queue(i, j)
+                self.game_copy.game_map.clear_ship_queue(current_cell.position)
+
                 #self.game_copy.game_map.set_cell_occupied_this_round(i, j, False)
 
-    def advance_game(self, commands, player_id):
+    def advance_game(self, commands, player_id, ship_moves={}):
         # Profiling
         start = timeit.default_timer()
 
@@ -138,8 +143,18 @@ class GameSimulator:
             elif split_command[0] == "m":
                 # Get ship id from command
                 ship_id = int(split_command[1])
+                # Get command for ship
+                ship_command = split_command[2]
                 # If current_player has this ship
                 if self.game_copy.players[player_id].has_ship(ship_id):
+                    # If we have a command from monte carlo
+                    if ship_id in ship_moves:
+                        monte_carlo_ship_moves = ship_moves[ship_id]
+                        if len(monte_carlo_ship_moves) > 0:
+                            # get mcts ship command
+                            ship_command = (monte_carlo_ship_moves[0].split(" "))[2]
+                            # Remove the command from the list
+                            del ship_moves[ship_id][0]
                     # Get ship in question
                     current_ship = self.game_copy.players[player_id].get_ships_dict()[ship_id]
                     # Get ships current cell
@@ -157,7 +172,7 @@ class GameSimulator:
                     # Has ship failed to move
                     failed_to_move = False
                     # IF NOT STAY STILL
-                    if split_command[2] != "o":
+                    if ship_command != "o":
                         # Movement cost for ship
                         move_cost = int(round((1/constants.MOVE_COST_RATIO) * current_cell.halite_amount))
 
@@ -218,7 +233,7 @@ class GameSimulator:
                             logging.warning("Player " + str(player_id) + " wanted to move ship " + str(ship_id) + ", but doesn't have enough halite")
 
                     # COMMAND - Stay (mine) or if ship failed to move
-                    if split_command[2] == "o" or failed_to_move:
+                    if ship_command == "o" or failed_to_move:
                         # Amount ship will gather
                         gather_amount = int(round((1/constants.EXTRACT_RATIO) * current_cell.halite_amount))
                         # Check if gather amount would go over ship maximum
@@ -254,7 +269,8 @@ class GameSimulator:
         end = timeit.default_timer()
         self.advance_game_time_sum = self.advance_game_time_sum + (end-start)
 
-    def run_simulation(self, default_policy_bot):
+    # Run this with the parameter containing the ship moves from monte carlo where the key is an int (ship id) and the value is a LIST of commands
+    def run_simulation(self, default_policy_bot, ship_moves={}):
         while self.game_copy.turn_number < self.search_depth:
             # Print map for DEBUGGING
             self.print_map()
@@ -271,7 +287,7 @@ class GameSimulator:
             self.bot_time_sum = self.bot_time_sum + (end - start)
 
             # Advance game based on returns of the bot
-            self.advance_game(returns[0], returns[1])
+            self.advance_game(returns[0], returns[1], ship_moves)
 
             # Increment turn by one
             self.game_copy.turn_number += 1
