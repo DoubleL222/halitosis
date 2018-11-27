@@ -49,7 +49,7 @@ class Game:
         :returns: nothing.
         """
         self.turn_number = int(read_input())
-        logging.info("=============== TURN {:03} ================".format(self.turn_number))
+        logging.info("=============== TURN {:03} ================ ".format(self.turn_number))
 
         for _ in range(len(self.players)):
             player, num_ships, num_dropoffs, halite = map(int, read_input().split())

@@ -1,6 +1,7 @@
 from .entity import Shipyard, Ship, Dropoff
 from .positionals import Position
 from .common import read_input
+import logging
 
 class Player:
     """
@@ -21,6 +22,12 @@ class Player:
         """
         return self._ships[ship_id]
 
+    def get_ships_dict(self):
+        """
+        :return: all ship dictionary
+        """
+        return self._ships
+
     def get_ships(self):
         """
         :return: Returns all ship objects in a list
@@ -40,6 +47,31 @@ class Player:
         :return: Returns all dropoff objects in a list
         """
         return list(self._dropoffs.values())
+
+    def add_ship(self, ship, ship_id):
+        """
+        :param ship: ship object to add
+        :param ship_id: ship id to add
+        :return: nothing
+        """
+        self._ships[ship_id] = ship
+
+    def remove_ship(self, ship_id):
+        logging.warning("shipID " + str(ship_id) + " ;" + str(self._ships))
+        if ship_id in self._ships:
+            del self._ships[ship_id]
+
+    def add_ship_halite(self, ship_id, halite_to_add):
+        self._ships[ship_id].halite_amount += halite_to_add
+
+    def set_ship_halite(self, ship_id, halite_to_set):
+        self._ships[ship_id].halite_amount = halite_to_set
+
+    def add_player_halite(self, halite_to_add):
+        self.halite_amount += halite_to_add
+
+    def change_ship_position(self, ship_id, new_position):
+        self._ships[ship_id].position = new_position
 
     def has_ship(self, ship_id):
         """
