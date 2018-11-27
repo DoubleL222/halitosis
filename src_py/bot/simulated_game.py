@@ -23,10 +23,12 @@ class GameSimulator:
     """
     The is a representation of the Game class
     """
-    def __init__(self, game_to_copy, to_search_depth=hlt.constants.MAX_TURNS):
+    def __init__(self, game_to_copy, to_search_depth=-1):
         # Profiling
         start = timeit.default_timer()
 
+        if to_search_depth == -1:
+            to_search_depth = hlt.constants.MAX_TURNS
         # Set search depth for simulation
         self.search_depth = to_search_depth
 
@@ -38,7 +40,8 @@ class GameSimulator:
             self.game_copy.players = copy.deepcopy(game_to_copy.players)
 
         # Setting shipyard position cells halite to 0
-        for curr_player in self.game_copy.players:
+        for curr_player_id in self.game_copy.players:
+            curr_player = self.game_copy.players[curr_player_id]
             self.game_copy.game_map.set_cell_halite(curr_player.shipyard.position, 0)
             # Create ship dictionary for keeping score
             for current_ship in curr_player.get_ships():
@@ -91,18 +94,20 @@ class GameSimulator:
         # Reset necessary map cells members
         for i in range(len(self.game_copy.game_map.get_cells())):
             for j in range(len(self.game_copy.game_map.get_cells()[i])):
-                ship_queue = self.game_copy.game_map[i][j].ship_queue
+                current_cell = self.game_copy.game_map.get_cells()[i][j]
+                ship_queue = self.game_copy.game_map.get_cell_ship_queue(current_cell.position)
                 # If only one ship entering/staying in cell put it there
                 if len(ship_queue) == 1:
-                    self.game_copy.game_map.add_ship_to_cell(i, j, ship_queue[0])
+                    self.game_copy.game_map.add_ship_to_cell(current_cell.position, ship_queue[0])
                 # If more than one ship coming to same cell, destroy all
                 elif len(ship_queue) > 1:
-                    logging.warning("Ships collided on map cell: i: " + str(i) + ", j: " + str(j) + "; ships:")
+                    logging.warning("Ships collided on map cell: i: " + str(current_cell.position.x) + ", j: " + str(current_cell.position.y) + "; ships:")
                     for current_ship in ship_queue:
                         logging.warning("Ship id: " + str(current_ship.id) + ", owner: " + str(current_ship.owner))
                         self.game_copy.players[current_ship.owner].remove_ship(current_ship.id)
                 # Clear ship queue for cell
-                self.game_copy.game_map.clear_ship_queue(i, j)
+                self.game_copy.game_map.clear_ship_queue(current_cell.position)
+
                 #self.game_copy.game_map.set_cell_occupied_this_round(i, j, False)
 
     def advance_game(self, commands, player_id):
