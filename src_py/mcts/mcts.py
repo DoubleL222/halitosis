@@ -7,7 +7,6 @@ from hlt.positionals import Direction
 import math
 import copy
 import random
-import logging
 
 
 class TreeNode:
@@ -155,15 +154,16 @@ class Mcts:
         temp_ship_best_action_lists[self.shipId] = new_ship_action_tree
 
     @staticmethod
-    def do_simulation(simulator, ship_action_lists):
+    def do_simulation(simulator, default_policy, ship_action_lists):
 
         # Do the simulation, using our current game state, and our new action list,
         # as well as the current best actions for the other ships.
         # Call Luka's simulation thingy with the state and the given ship_action_trees,
         # to receive a reward.
+        rewards = simulator.run_simulation(default_policy, ship_action_lists)
 
         # return self.gameState.function_to_call(ship_action_lists)
-        return simulator.function_to_call(ship_action_lists)
+        return rewards
         # return random.randrange(1, 10)
 
     def best_child(self, node):

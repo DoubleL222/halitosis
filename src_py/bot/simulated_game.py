@@ -270,7 +270,9 @@ class GameSimulator:
         self.advance_game_time_sum = self.advance_game_time_sum + (end-start)
 
     # Run this with the parameter containing the ship moves from monte carlo where the key is an int (ship id) and the value is a LIST of commands
-    def run_simulation(self, default_policy_bot, ship_moves={}):
+    def run_simulation(self, default_policy_bot, ship_moves=None):
+        if ship_moves is None:
+            ship_moves = {}
         while self.game_copy.turn_number < self.search_depth:
             # Print map for DEBUGGING
             self.print_map()

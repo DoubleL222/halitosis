@@ -21,10 +21,10 @@ from mcts import mcts
 import time
 
 #simulation
-import bot.simulated_game
-import bot.random_bot
-
+from bot import random_bot
+from bot import simulated_game
 import timeit
+
 """ <<<Game Begin>>> """
 
 # This game object contains the initial game state.
@@ -50,23 +50,6 @@ while True:
 
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
-
-    #SIMULATION
-    start = timeit.default_timer()
-
-    sim = bot.simulated_game.GameSimulator(game)
-    default_policy = bot.random_bot.RandomBot(sim.game_copy, me.id)
-    sim.run_simulation(default_policy)
-
-    end = timeit.default_timer()
-    logging.info("------------ PERFORMANCE REPORT -------------")
-    bot.profiling.print_ms_message((end - start), "Simulation took: ")
-    bot.profiling.print_ms_message(sim.deep_copy_time_sum, "Deep copy took: ")
-    bot.profiling.print_ms_message(sim.bot_time_sum, "Bot took: ")
-    bot.profiling.print_ms_message(sim.advance_game_time_sum, "Advance game took: ")
-
-    #END SIMULATION
-
     command_queue = []
 
     # --------------------------------------------------------
@@ -86,6 +69,22 @@ while True:
     # --------------------------------------------------------
     # Random Movement - END
     # --------------------------------------------------------
+
+    #SIMULATION
+
+    sim = simulated_game.GameSimulator(game)
+    default_policy = random_bot.RandomBot(sim.game_copy, me.id)
+    # start = timeit.default_timer()
+    # sim.run_simulation(default_policy)
+    #
+    # end = timeit.default_timer()
+    # logging.info("------------ PERFORMANCE REPORT -------------")
+    # bot.profiling.print_ms_message((end - start), "Simulation took: ")
+    # bot.profiling.print_ms_message(sim.deep_copy_time_sum, "Deep copy took: ")
+    # bot.profiling.print_ms_message(sim.bot_time_sum, "Bot took: ")
+    # bot.profiling.print_ms_message(sim.advance_game_time_sum, "Advance game took: ")
+
+    #END SIMULATION
 
     # --------------------------------------------------------
     # MCTS - START
@@ -128,7 +127,7 @@ while True:
                 for mcts_runner in mcts_runners:
                     ship_action_lists[mcts_runner.shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
 
-                rewards = mcts.Mcts.do_simulation(sim, ship_action_lists)
+                rewards = mcts.Mcts.do_simulation(simulator=sim, ship_action_lists=ship_action_lists)
 
                 for mcts_runner in mcts_runners:
                     child_node = mcts_runner.lastGeneratedChildren.my_dict.pop(action, None)
