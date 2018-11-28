@@ -7,7 +7,7 @@ from hlt.positionals import Direction
 import math
 import copy
 import random
-
+import logging
 
 class TreeNode:
 
@@ -28,12 +28,13 @@ class Mcts:
     ship_best_action_lists = {}
 
     # exploration_constant note: Larger values will increase exploitation, smaller will increase exploration.
-    def __init__(self, exploration_constant=1 / math.sqrt(2), game_state=None, ship_id=None,
+    def __init__(self, exploration_constant=1 / math.sqrt(2), game_state=None, ship=None,
                  current_turn=1, game_max_turns=1, do_merged_simulations=True,
                  use_best_action_list_for_other_ships=True, simulator=None, default_policy=None):
         self.explorationConstant = exploration_constant
         self.rootNode = TreeNode()
-        self.shipId = ship_id
+        self.ship = ship
+        self.shipId = ship.id
         self.currentTurn = current_turn
         self.gameMaxTurns = game_max_turns
         self.gameState = game_state
@@ -70,7 +71,7 @@ class Mcts:
     # happens.
     def tree_policy(self):
         node = self.rootNode
-        while not self.doMergedSimulations or not node.isTerminal:
+        while self.doMergedSimulations or not node.isTerminal:
             if not node.isFullyExpanded:
                 self.expand(node)
                 return
@@ -91,13 +92,16 @@ class Mcts:
     #     return v'
 
     def expand(self, node):
+        logging.info("expanding node: " + str(node))
         # We always expand all possible nodes of a given node immediately.
         while not node.isFullyExpanded:
             for action in Mcts.ship_commands:
                 new_node = self.generate_new_node(node, action)
+                logging.info("new_node: " + str(new_node) + " with action: " + action)
                 if not self.doMergedSimulations:
-                    rewards = self.do_simulation(default_policy=self.defaultPolicy, simulator=self.simulator,
-                                                 ship_action_lists=self.compile_new_action_lists_for_individual_run(node))
+                    rewards = self.do_simulation(simulator=self.simulator, default_policy=self.defaultPolicy,
+                                                 ship_action_lists=self.compile_new_action_lists_for_individual_run(new_node))
+                    logging.info("rewards: " + str(rewards))
                     new_node.totalReward = rewards.pop(self.shipId, 0)
                     self.backpropagate(new_node, new_node.totalReward)
                 else:
@@ -107,14 +111,14 @@ class Mcts:
 
         # Update the current best action list in the main dictionary, but only after simulating and
         # backpropagating all the new child nodes.
-        if self.doMergedSimulations:
+        if not self.doMergedSimulations:
             self.update_ship_best_action_list()
         return
 
     # Create a new action list, with the given action as the first action, and using the given parent's action as
     # the previous action, and move up the tree from that parent, adding actions on the way.
     def get_specific_action_list(self, bottom_action, parent):
-        new_ship_action_tree = [bottom_action]
+        new_ship_action_tree = [self.ship.move(bottom_action)]
 
         if parent is not None:
             # Make a temp-variable, for walking up the tree of parents.
@@ -124,7 +128,7 @@ class Mcts:
             while True:
                 if parent_temp.action is None:
                     break
-                new_ship_action_tree.insert(0, parent_temp.action)
+                new_ship_action_tree.insert(0, self.ship.move(parent_temp.action))
                 if parent_temp.parent is None:
                     break
                 parent_temp = parent_temp.parent
@@ -150,13 +154,19 @@ class Mcts:
             temp_ship_best_action_lists = {}
 
         # Create a new action list for this ship, with the given action as the first action.
+        logging.info("node.action: " + str(node.action))
+        logging.info("node.parent: " + str(node.parent))
         new_ship_action_tree = self.get_specific_action_list(node.action, node.parent)
+        logging.info("new_ship_action_tree: " + str(new_ship_action_tree))
 
         # Replace our ship's current action list (in the copy) with our new action list.
         temp_ship_best_action_lists[self.shipId] = new_ship_action_tree
+        logging.info("temp_ship_best_action_lists: " + str(temp_ship_best_action_lists))
+
+        return temp_ship_best_action_lists
 
     @staticmethod
-    def do_simulation(simulator, default_policy, ship_action_lists):
+    def do_simulation(simulator=None, default_policy=None, ship_action_lists=None):
 
         # Do the simulation, using our current game state, and our new action list,
         # as well as the current best actions for the other ships.

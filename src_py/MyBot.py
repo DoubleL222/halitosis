@@ -94,7 +94,7 @@ while True:
 
     # Settings for MCTS runs.
     # Timestamp = current time + time limit (all values are in seconds and are floats)
-    do_merged_simulations = True
+    do_merged_simulations = False
     use_best_action_list_for_other_ships = True
     max_iterations = 100
     num_iterations_done = 0
@@ -108,7 +108,7 @@ while True:
     # Create MCTS runners for each ship
     mcts_runners = []
     for ship in me.get_ships():
-        mcts_runners.append(mcts.Mcts(ship_id=ship.id, game_state=game, current_turn=game.turn_number,
+        mcts_runners.append(mcts.Mcts(ship=ship, game_state=game, current_turn=game.turn_number,
                                       game_max_turns=constants.MAX_TURNS,
                                       do_merged_simulations=do_merged_simulations,
                                       use_best_action_list_for_other_ships=use_best_action_list_for_other_ships,
