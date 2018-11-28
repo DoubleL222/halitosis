@@ -17,6 +17,8 @@ import timeit
 
 import bot.profiling
 
+
+
 class GameSimulator:
     """
     The is a representation of the Game class
@@ -25,25 +27,29 @@ class GameSimulator:
         # Profiling
         start = timeit.default_timer()
 
+        # Should I debug that
+        self.do_debug = True
+
         if to_search_depth == -1:
             to_search_depth = hlt.constants.MAX_TURNS
         # Set search depth for simulation
         self.search_depth = to_search_depth
 
-        # Dictionary for keeping ship scores for Monte Carlo
-        self.ship_scores = {}
-
         if isinstance(game_to_copy, hlt.Game):
-            self.game_copy = copy.deepcopy(game_to_copy)
-            self.game_copy.players = copy.deepcopy(game_to_copy.players)
+            self.original_game = copy.deepcopy(game_to_copy)
+            self.original_game.players = copy.deepcopy(game_to_copy.players)
 
         # Setting shipyard position cells halite to 0
-        for curr_player_id in self.game_copy.players:
-            curr_player = self.game_copy.players[curr_player_id]
-            self.game_copy.game_map.set_cell_halite(curr_player.shipyard.position, 0)
-            # Create ship dictionary for keeping score
-            for current_ship in curr_player.get_ships():
-                self.ship_scores[current_ship.id] = 0
+        for curr_player_id in self.original_game.players:
+            curr_player = self.original_game.players[curr_player_id]
+            self.original_game.game_map.set_cell_halite(curr_player.shipyard.position, 0)
+
+        # Init game copy
+        self.game_copy = self.original_game
+        self.game_copy.players = self.original_game.players
+
+        # Dictionary for keeping ship scores for Monte Carlo
+        self.ship_scores = {}
 
         # Profiling
         end = timeit.default_timer()
@@ -52,6 +58,24 @@ class GameSimulator:
         self.deep_copy_time_sum = end-start
         self.advance_game_time_sum = 0
         self.bot_time_sum = 0
+
+    def reset_simulator(self):
+        self.game_copy = self.original_game
+        self.game_copy.players = self.original_game.players
+        self.advance_game_time_sum = 0
+        self.bot_time_sum = 0
+        self.init_ship_scores()
+
+    def init_ship_scores(self):
+        # Dictionary for keeping ship scores for Monte Carlo
+        self.ship_scores = {}
+
+        # Setting shipyard position cells halite to 0
+        for curr_player_id in self.game_copy.players:
+            curr_player = self.game_copy.players[curr_player_id]
+            # Create ship dictionary for keeping score
+            for current_ship in curr_player.get_ships():
+                self.ship_scores[current_ship.id] = 0
 
     def add_halite_score_to_ship(self, ship_id, halite):
         if ship_id in self.ship_scores:
@@ -99,9 +123,11 @@ class GameSimulator:
                     self.game_copy.game_map.add_ship_to_cell(current_cell.position, ship_queue[0])
                 # If more than one ship coming to same cell, destroy all
                 elif len(ship_queue) > 1:
-                    logging.warning("Ships collided on map cell: i: " + str(current_cell.position.x) + ", j: " + str(current_cell.position.y) + "; ships:")
+                    if self.do_debug:
+                        logging.warning("Ships collided on map cell: i: " + str(current_cell.position.x) + ", j: " + str(current_cell.position.y) + "; ships:")
                     for current_ship in ship_queue:
-                        logging.warning("Ship id: " + str(current_ship.id) + ", owner: " + str(current_ship.owner))
+                        if self.do_debug:
+                            logging.warning("Ship id: " + str(current_ship.id) + ", owner: " + str(current_ship.owner))
                         self.game_copy.players[current_ship.owner].remove_ship(current_ship.id)
                 # Clear ship queue for cell
                 self.game_copy.game_map.clear_ship_queue(current_cell.position)
@@ -135,8 +161,9 @@ class GameSimulator:
                     # Add ship to cell queue
                     self.game_copy.game_map.add_ship_to_cell_queue(current_player.shipyard.position, self.game_copy.players[current_player.id].get_ship(new_ship.id))
                 else:
-                    # Log warning if current_player does not have enough money for generating new ship
-                    logging.warning("Player "+str(player_id)+" wanted to build ship, but doesn't have enough halite")
+                    if self.do_debug:
+                        # Log warning if current_player does not have enough money for generating new ship
+                        logging.warning("Player "+str(player_id)+" wanted to build ship, but doesn't have enough halite")
             # COMMAND - Move ship
             elif split_command[0] == "m":
                 # Get ship id from command
@@ -227,8 +254,9 @@ class GameSimulator:
                         else:
                             failed_to_move = True
                             # Log warning for failed to move
-                            logging.warning(str(ship_id) +" has "+ str(current_ship.halite_amount))
-                            logging.warning("Player " + str(player_id) + " wanted to move ship " + str(ship_id) + ", but doesn't have enough halite")
+                            if self.do_debug:
+                                logging.warning(str(ship_id) +" has "+ str(current_ship.halite_amount))
+                                logging.warning("Player " + str(player_id) + " wanted to move ship " + str(ship_id) + ", but doesn't have enough halite")
 
                     # COMMAND - Stay (mine) or if ship failed to move
                     if ship_command == "o" or failed_to_move:
@@ -251,9 +279,10 @@ class GameSimulator:
 
                 # If current_player does not have this ship we write a warning to log file
                 else:
-                    logging.warning(
-                        "Player " + str(player_id) + " wanted to move ship "+str(ship_id)+", but doesn't have it")
-                    logging.warning(str(self.game_copy.players[player_id].get_ships_dict()))
+                    if self.do_debug:
+                        logging.warning(
+                            "Player " + str(player_id) + " wanted to move ship "+str(ship_id)+", but doesn't have it")
+                        logging.warning(str(self.game_copy.players[player_id].get_ships_dict()))
                 #print("move")
 
             elif split_command[0] == "c":
@@ -268,12 +297,12 @@ class GameSimulator:
         self.advance_game_time_sum = self.advance_game_time_sum + (end-start)
 
     # Run this with the parameter containing the ship moves from monte carlo where the key is an int (ship id) and the value is a LIST of commands
-    def run_simulation(self, default_policy_bot, ship_moves=None):
-        if ship_moves is None:
-            ship_moves = {}
+    def run_simulation(self, default_policy_bot, ship_moves={}):
+        self.reset_simulator()
         while self.game_copy.turn_number < self.search_depth:
-            # Print map for DEBUGGING
-            self.print_map()
+            if self.do_debug:
+                # Print map for DEBUGGING
+                self.print_map()
 
             # Print turn number to log file
             logging.info("+++++++++ TURN {:03} +++++++++ :SIM".format(self.game_copy.turn_number))
