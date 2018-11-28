@@ -32,12 +32,12 @@ class GameSimulator:
         # Set search depth for simulation
         self.search_depth = to_search_depth
 
-        # Dictionary for keeping ship scores for Monte Carlo
-        self.ship_scores = {}
-
         if isinstance(game_to_copy, hlt.Game):
             self.game_copy = copy.deepcopy(game_to_copy)
             self.game_copy.players = copy.deepcopy(game_to_copy.players)
+
+        # Dictionary for keeping ship scores for Monte Carlo
+        self.ship_scores = {}
 
         # Setting shipyard position cells halite to 0
         for curr_player_id in self.game_copy.players:
@@ -54,6 +54,17 @@ class GameSimulator:
         self.deep_copy_time_sum = end-start
         self.advance_game_time_sum = 0
         self.bot_time_sum = 0
+
+    def init_ship_scores(self):
+        # Dictionary for keeping ship scores for Monte Carlo
+        self.ship_scores = {}
+
+        # Setting shipyard position cells halite to 0
+        for curr_player_id in self.game_copy.players:
+            curr_player = self.game_copy.players[curr_player_id]
+            # Create ship dictionary for keeping score
+            for current_ship in curr_player.get_ships():
+                self.ship_scores[current_ship.id] = 0
 
     def add_halite_score_to_ship(self, ship_id, halite):
         if ship_id in self.ship_scores:
@@ -271,6 +282,7 @@ class GameSimulator:
 
     # Run this with the parameter containing the ship moves from monte carlo where the key is an int (ship id) and the value is a LIST of commands
     def run_simulation(self, default_policy_bot, ship_moves={}):
+        self.init_ship_scores()
         while self.game_copy.turn_number < self.search_depth:
             # Print map for DEBUGGING
             self.print_map()
