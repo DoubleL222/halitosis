@@ -54,6 +54,7 @@ while True:
     sim = bot.simulated_game.GameSimulator(game)
     default_policy = bot.random_bot.RandomBot(sim.game_copy, me.id)
     sim.run_simulation(default_policy)
+    sim.run_simulation(default_policy)
 
     end = timeit.default_timer()
     logging.info("------------ PERFORMANCE REPORT -------------")
