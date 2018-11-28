@@ -127,7 +127,9 @@ while True:
                 for mcts_runner in mcts_runners:
                     ship_action_lists[mcts_runner.shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
 
-                rewards = mcts.Mcts.do_simulation(simulator=sim, ship_action_lists=ship_action_lists)
+                #rewards = mcts.Mcts.do_simulation(simulator=sim, ship_action_lists=ship_action_lists)
+                # Run simulation
+                rewards = sim.run_simulation(default_policy, ship_action_lists)
 
                 for mcts_runner in mcts_runners:
                     child_node = mcts_runner.lastGeneratedChildren.my_dict.pop(action, None)
