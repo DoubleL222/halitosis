@@ -30,7 +30,7 @@ class Mcts:
     # exploration_constant note: Larger values will increase exploitation, smaller will increase exploration.
     def __init__(self, exploration_constant=1 / math.sqrt(2), game_state=None, ship_id=None,
                  current_turn=1, game_max_turns=1, do_merged_simulations=True,
-                 use_best_action_list_for_other_ships=True, simulator=None):
+                 use_best_action_list_for_other_ships=True, simulator=None, default_policy=None):
         self.explorationConstant = exploration_constant
         self.rootNode = TreeNode()
         self.shipId = ship_id
@@ -40,6 +40,7 @@ class Mcts:
         self.doMergedSimulations = do_merged_simulations
         self.useBestActionListForOtherShips = use_best_action_list_for_other_ships
         self.simulator = simulator
+        self.defaultPolicy = default_policy
         self.lastExpandedNode = None
         self.lastGeneratedChildren = {}
 
@@ -94,8 +95,9 @@ class Mcts:
         while not node.isFullyExpanded:
             for action in Mcts.ship_commands:
                 new_node = self.generate_new_node(node, action)
-                if self.doMergedSimulations:
-                    rewards = self.do_simulation(self.simulator, self.compile_new_action_lists_for_individual_run(node))
+                if not self.doMergedSimulations:
+                    rewards = self.do_simulation(default_policy=self.defaultPolicy, simulator=self.simulator,
+                                                 ship_action_lists=self.compile_new_action_lists_for_individual_run(node))
                     new_node.totalReward = rewards.pop(self.shipId, 0)
                     self.backpropagate(new_node, new_node.totalReward)
                 else:

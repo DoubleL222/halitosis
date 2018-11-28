@@ -26,6 +26,7 @@ from bot import simulated_game
 import timeit
 
 """ <<<Game Begin>>> """
+debugging = False
 
 # This game object contains the initial game state.
 game = hlt.Game()
@@ -35,8 +36,9 @@ game = hlt.Game()
 game.ready("MyPythonBot")
 
 # Now that your bot is initialized, save a message to yourself in the log file with some important information.
-#   Here, you log here your id, which you can always fetch from the game object by using my_id.
-logging.info("Successfully created bot! My Player ID is {}.".format(game.my_id))
+# Here, you log here your id, which you can always fetch from the game object by using my_id.
+if debugging:
+    logging.info("Successfully created bot! My Player ID is {}.".format(game.my_id))
 
 """ <<<Game Loop>>> """
 
@@ -92,12 +94,13 @@ while True:
 
     # Settings for MCTS runs.
     # Timestamp = current time + time limit (all values are in seconds and are floats)
-    do_merged_simulations = False
+    do_merged_simulations = True
     use_best_action_list_for_other_ships = True
     max_iterations = 100
     num_iterations_done = 0
     time_limit = time.time() + 1.0
     last_iteration_time = 0.0
+    full_time = 0.0
 
     # Reset best action lists
     mcts.Mcts.ship_best_action_lists = {}
@@ -109,7 +112,7 @@ while True:
                                       game_max_turns=constants.MAX_TURNS,
                                       do_merged_simulations=do_merged_simulations,
                                       use_best_action_list_for_other_ships=use_best_action_list_for_other_ships,
-                                      simulator=sim))
+                                      simulator=sim, default_policy=default_policy))
 
     while True:
         iteration_start_time = time.time()
@@ -121,13 +124,13 @@ while True:
         for mcts_runner in mcts_runners:
             mcts_runner.do_one_uct_update()
 
-        if not do_merged_simulations:
+        if do_merged_simulations:
             for action in mcts.Mcts.ship_commands:
                 ship_action_lists = {}
                 for mcts_runner in mcts_runners:
                     ship_action_lists[mcts_runner.shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
 
-                rewards = mcts.Mcts.do_simulation(simulator=sim, ship_action_lists=ship_action_lists)
+                rewards = mcts.Mcts.do_simulation(default_policy=default_policy, simulator=sim, ship_action_lists=ship_action_lists)
 
                 for mcts_runner in mcts_runners:
                     child_node = mcts_runner.lastGeneratedChildren.my_dict.pop(action, None)
@@ -139,11 +142,13 @@ while True:
                 mcts_runner.update_ship_best_action_list()
 
         last_iteration_time = time.time() - iteration_start_time
+        full_time += last_iteration_time
         num_iterations_done += 1
         if num_iterations_done >= max_iterations:
             break
 
-    logging.info("MCTS ran for " + str(num_iterations_done) + " iterations.")
+    if debugging:
+        logging.info("MCTS ran for " + str(num_iterations_done) + " iterations. Took " + str(full_time) + " seconds in total.")
 
     action_list_dict = mcts.Mcts.ship_best_action_lists
     for ship in me.get_ships():
@@ -152,16 +157,19 @@ while True:
         actions = ""
         for action in action_list:
             actions += action + ", "
-        logging.info("Ship " + str(ship.id) + " best action list after update: " + actions)
+        if debugging:
+            logging.info("Ship " + str(ship.id) + " best action list after update: " + actions)
 
         # Select an action using the newly updated best ship action lists.
         action = None
         if ship.id in action_list_dict:
             action = action_list_dict[ship.id][0]
-            logging.info("Ship is doing MCTS action: " + action)
+            if debugging:
+                logging.info("Ship is doing MCTS action: " + action)
         else:
             action = random.choice([Direction.North, Direction.South, Direction.East, Direction.West])
-            logging.info("Ship is doing random action: " + action)
+            if debugging:
+                logging.info("Ship is doing random action: " + action)
 
         # Append the chosen action to the command queue.
         command_queue.append(ship.move(action))

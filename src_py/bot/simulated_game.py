@@ -1,5 +1,3 @@
-from pip._vendor.pyparsing import oneOf
-
 import hlt
 import copy
 import hlt.player
@@ -9,7 +7,7 @@ from hlt import constants
 import random
 # This library contains direction metadata to better interface with the game.
 from hlt.positionals import Direction
-#Import ship
+#import ship
 from hlt.entity import Ship
 from hlt.game_map import MapCell
 #import logging
