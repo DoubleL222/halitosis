@@ -28,7 +28,7 @@ class GameSimulator:
         start = timeit.default_timer()
 
         # Should I debug that
-        self.do_debug = True
+        self.do_debug = False
 
         if to_search_depth == -1:
             to_search_depth = hlt.constants.MAX_TURNS
@@ -175,9 +175,9 @@ class GameSimulator:
                         logging.info("All ship moves: " + str(ship_moves))
                     # If we have a command from monte carlo
                     if ship_id in ship_moves:
+                        monte_carlo_ship_moves = ship_moves[ship_id]
                         if self.do_debug:
                             logging.info("Ship moves: " + str(monte_carlo_ship_moves))
-                        monte_carlo_ship_moves = ship_moves[ship_id]
                         if len(monte_carlo_ship_moves) > 0:
                             if self.do_debug:
                                 logging.info("Ship moves[0]: " + str(monte_carlo_ship_moves[0]))

@@ -8,6 +8,8 @@ import math
 import copy
 import random
 import logging
+from graphviz import Digraph
+
 
 class TreeNode:
 
@@ -26,6 +28,8 @@ class TreeNode:
 class Mcts:
     ship_commands = {'n', 's', 'e', 'w', 'o'}
     ship_best_action_lists = {}
+
+    debug = False
 
     # exploration_constant note: Larger values will increase exploitation, smaller will increase exploration.
     def __init__(self, exploration_constant=1 / math.sqrt(2), game_state=None, ship=None,
@@ -92,16 +96,19 @@ class Mcts:
     #     return v'
 
     def expand(self, node):
-        logging.info("expanding node: " + str(node))
+        if self.debug:
+            logging.info("expanding node: " + str(node))
         # We always expand all possible nodes of a given node immediately.
         while not node.isFullyExpanded:
             for action in Mcts.ship_commands:
                 new_node = self.generate_new_node(node, action)
-                logging.info("new_node: " + str(new_node) + " with action: " + action)
+                if self.debug:
+                    logging.info("new_node at depth " + str(new_node.depth) + " with action: " + action)
                 if not self.doMergedSimulations:
                     rewards = self.do_simulation(simulator=self.simulator, default_policy=self.defaultPolicy,
                                                  ship_action_lists=self.compile_new_action_lists_for_individual_run(new_node))
-                    logging.info("rewards: " + str(rewards))
+                    if self.debug:
+                        logging.info("rewards: " + str(rewards))
                     new_node.totalReward = rewards.pop(self.shipId, 0)
                     self.backpropagate(new_node, new_node.totalReward)
                 else:
@@ -154,14 +161,16 @@ class Mcts:
             temp_ship_best_action_lists = {}
 
         # Create a new action list for this ship, with the given action as the first action.
-        logging.info("node.action: " + str(node.action))
-        logging.info("node.parent: " + str(node.parent))
+        if self.debug:
+            logging.info("node.action: " + str(node.action))
         new_ship_action_tree = self.get_specific_action_list(node.action, node.parent)
-        logging.info("new_ship_action_tree: " + str(new_ship_action_tree))
+        if self.debug:
+            logging.info("new_ship_action_tree: " + str(new_ship_action_tree))
 
         # Replace our ship's current action list (in the copy) with our new action list.
         temp_ship_best_action_lists[self.shipId] = new_ship_action_tree
-        logging.info("temp_ship_best_action_lists: " + str(temp_ship_best_action_lists))
+        if self.debug:
+            logging.info("temp_ship_best_action_lists: " + str(temp_ship_best_action_lists))
 
         return temp_ship_best_action_lists
 
@@ -226,3 +235,17 @@ class Mcts:
             node.totalReward += reward
             node = node.parent
         return
+
+    def generate_graph(self):
+        g = Digraph('G', filename='mcts_graph' + str(random.randint(0, 10000)) + '.gv')
+        g.node("root", label="Root")
+        self.recursive_graph_node(g, self.rootNode, "root", "r")
+        g.view()
+
+    def recursive_graph_node(self, g, node, parent_name, parent_action):
+        for child in node.children:
+            node_name = str(child.depth - 1) + parent_action + "->" + str(child.depth) + child.action
+            node_label = "a: " + child.action + ", s:" + "{:.2f}".format(child.totalReward / child.visits) + ", v:" + str(child.visits)
+            g.node(node_name, label=node_label)
+            g.edge(parent_name, node_name)
+            self.recursive_graph_node(g, child, node_name, child.action)

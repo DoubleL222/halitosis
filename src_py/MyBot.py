@@ -24,7 +24,6 @@ import time
 from bot import random_bot
 from bot import simulated_game
 import timeit
-
 """ <<<Game Begin>>> """
 debugging = False
 
@@ -149,6 +148,8 @@ while True:
 
     if debugging:
         logging.info("MCTS ran for " + str(num_iterations_done) + " iterations. Took " + str(full_time) + " seconds in total.")
+        if game.turn_number == 20:
+            mcts_runners[0].generate_graph()
 
     action_list_dict = mcts.Mcts.ship_best_action_lists
     for ship in me.get_ships():
