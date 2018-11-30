@@ -305,7 +305,6 @@ class GameSimulator:
             if self.do_debug:
                 # Print map for DEBUGGING
                 self.print_map()
-
             # Print turn number to log file
             logging.info("+++++++++ TURN {:03} +++++++++ :SIM".format(self.game_copy.turn_number))
 
