@@ -33,6 +33,9 @@ public:
 
     OptimalPath get_optimal_path(
         hlt::Ship& ship,
+        // The number of turns a ship has been underway already.
+        // Needed to avoid ships heading home too early
+        size_t current_turns_underway,
         hlt::Position end,
         time_point end_time,
         unsigned int max_depth,

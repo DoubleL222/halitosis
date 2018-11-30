@@ -14,6 +14,7 @@ class FirstBot : public Bot {
     std::unordered_map<hlt::EntityId, Plan> plans;
     bool should_build_ship;
     std::unordered_map<hlt::EntityId, hlt::Position> previous_positions;
+    std::unordered_map<hlt::EntityId, unsigned int> current_turns_underway;
 
 public:
     FirstBot(unsigned int seed);

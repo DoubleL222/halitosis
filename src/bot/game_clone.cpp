@@ -77,10 +77,9 @@ SearchPath GameClone::get_search_path(
     hlt::Position current_pos = end;
     for (int depth=max_depth; depth>0; depth--) {
         int idx = frame.get_depth_index(depth, current_pos);
-        auto prev_pos = current_pos.directional_offset(
-            hlt::invert_direction(search_state[idx].in_direction));
-        prev_pos = frame.get_game().game_map->normalize(prev_pos);
-        int prev_idx = frame.get_depth_index(depth-1, current_pos);
+        auto prev_pos =
+            frame.move(current_pos, hlt::invert_direction(search_state[idx].in_direction));
+        int prev_idx = frame.get_depth_index(depth-1, prev_pos);
 
         res[depth-1] = PathSegment(
             search_state[idx].in_direction,
@@ -99,21 +98,17 @@ bool should_update_search(SearchState& cur, hlt::Halite halite, SearchState& bes
 // Find an optimal path to a point for a ship on a specific map.
 OptimalPath GameClone::get_optimal_path(
     hlt::Ship& ship,
+    size_t current_turns_underway,
     hlt::Position end,
     time_point end_time,
     unsigned int max_depth,
     unsigned int defensive_turns
 ) const {
     auto start = ship.position;
-    auto search_state_owned = std::make_unique<SearchState[]>(max_depth*frame.get_board_size());
+    // Avoid segfault when max_depth == 0
+    auto search_state_depth = std::max(max_depth, 1u);
+    auto search_state_owned = std::make_unique<SearchState[]>(search_state_depth*frame.get_board_size());
     auto search_state = search_state_owned.get();
-
-    if (max_depth == 0) {
-        OptimalPath res;
-        res.path = get_search_path(search_state, start, end, 0);
-        res.search_depth = 0;
-        return res;
-    }
 
     int start_idx = frame.get_depth_index(0, start);
     search_state[start_idx].halite = ship.halite;
@@ -200,15 +195,21 @@ OptimalPath GameClone::get_optimal_path(
     float best_halite_per_turn = 0;
     for (unsigned int depth=1; depth < search_depth; depth++) {
         int idx = frame.get_depth_index(depth, end);
-        float halite_per_turn = ((float)(search_state[idx].halite))/depth;
+        float halite_per_turn = ((float)(search_state[idx].halite))/(depth+current_turns_underway);
         if (halite_per_turn > best_halite_per_turn) {
             best_halite_per_turn = halite_per_turn;
             best_per_turn_depth = depth;
         }
     }
+
     OptimalPath res;
-    res.path = get_search_path(search_state, start, end, best_per_turn_depth);
     res.search_depth = search_depth;
+    if (best_per_turn_depth == 0) {
+        // No path found
+        res.path = {};
+    } else {
+        res.path = get_search_path(search_state, start, end, best_per_turn_depth);
+    }
     return res;
 }
 
