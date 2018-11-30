@@ -83,10 +83,11 @@ class Mcts:
                 node = self.best_child(node)
 
     def get_current_best_action_node(self):
-        node = self.rootNode
-        while not node.isTerminal and node.isFullyExpanded:
-            node = self.best_child_by_reward_only(node)
-        return node
+        best_child = None
+        for child in self.rootNode.children:
+            if best_child is None or child.totalReward / child.visits > best_child.totalReward / best_child.visits:
+                best_child = child
+        return best_child
 
     # function EXPAND(v)
     #     choose a ∈ untried actions from A(s(v))
@@ -194,19 +195,6 @@ class Mcts:
             exploit = child.totalReward / child.visits
             explore = math.sqrt(2.0 * math.log(node.visits) / float(child.visits))
             score = exploit + self.explorationConstant * explore
-            if score == best_score:
-                best_children.append(child)
-            if score > best_score:
-                best_children = [child]
-                best_score = score
-        return random.choice(best_children)
-
-    # Used only to find the current best action, to make an action list from.
-    def best_child_by_reward_only(self, node):
-        best_score = 0.0
-        best_children = []
-        for child in node.children:
-            score = child.totalReward / child.visits
             if score == best_score:
                 best_children.append(child)
             if score > best_score:
