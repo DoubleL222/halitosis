@@ -12,6 +12,7 @@ from hlt.entity import Ship
 from hlt.game_map import MapCell
 #import logging
 import logging
+import bot.profiling
 
 import timeit
 
@@ -29,6 +30,7 @@ class GameSimulator:
 
         # Should I debug that
         self.do_debug = False
+        self.do_performance_debug = True
 
         if to_search_depth == -1:
             to_search_depth = hlt.constants.MAX_TURNS
@@ -326,6 +328,11 @@ class GameSimulator:
 
             # Increment turn by one
             self.game_copy.turn_number += 1
+
+        if self.do_performance_debug:
+            bot.profiling.print_ms_message("Deep copy took: ", self.deep_copy_time_sum)
+            bot.profiling.print_ms_message("Simulation took: ", self.advance_game_time_sum)
+            bot.profiling.print_ms_message("Bot took: ", self.bot_time_sum)
 
         if self.do_debug:
             logging.info("Turn number: " + str(self.game_copy.turn_number))

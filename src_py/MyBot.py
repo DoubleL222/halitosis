@@ -93,7 +93,7 @@ while True:
 
     # Settings for MCTS runs.
     # Timestamp = current time + time limit (all values are in seconds and are floats)
-    do_merged_simulations = False
+    do_merged_simulations = True
     use_best_action_list_for_other_ships = True
     max_iterations = 100
     num_iterations_done = 0
@@ -149,7 +149,8 @@ while True:
     if debugging:
         logging.info("MCTS ran for " + str(num_iterations_done) + " iterations. Took " + str(full_time) + " seconds in total.")
         if game.turn_number == 20:
-            mcts_runners[0].generate_graph()
+            a = 1
+            #mcts_runners[0].generate_graph()
 
     action_list_dict = mcts.Mcts.ship_best_action_lists
     for ship in me.get_ships():

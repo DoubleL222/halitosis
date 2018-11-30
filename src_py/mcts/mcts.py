@@ -8,7 +8,7 @@ import math
 import copy
 import random
 import logging
-from graphviz import Digraph
+#from graphviz import Digraph
 
 
 class TreeNode:
@@ -225,10 +225,11 @@ class Mcts:
         return
 
     def generate_graph(self):
-        g = Digraph('G', filename='mcts_graph' + str(random.randint(0, 10000)) + '.gv')
-        g.node("root", label="Root")
-        self.recursive_graph_node(g, self.rootNode, "root", "r")
-        g.view()
+        a = 1
+        #g = Digraph('G', filename='mcts_graph' + str(random.randint(0, 10000)) + '.gv')
+        #g.node("root", label="Root")
+        #self.recursive_graph_node(g, self.rootNode, "root", "r")
+        #g.view()
 
     def recursive_graph_node(self, g, node, parent_name, parent_action):
         for child in node.children:
