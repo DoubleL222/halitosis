@@ -2,6 +2,7 @@
 #include "bot/frame.hpp"
 #include "bot/game_clone.hpp"
 
+#include <algorithm>
 
 hlt::Game FirstBot::advance_game(hlt::Game& game, std::vector<hlt::Command> moves)
 {
@@ -16,11 +17,11 @@ FirstBot::FirstBot(unsigned int seed)
 
 void FirstBot::init(hlt::Game& game) {
     // Last thing to call
-    game.ready("FirstBot");
+    game.ready("Updated");
 }
 
 // Max depth used by get_optimal_path
-const unsigned int MAX_SEARCH_DEPTH = 200;
+const unsigned int MAX_SEARCH_DEPTH = 120;
 // Assume that a new ship will collect halite at this rate compared to the most recent ship for
 // the rest of the game.
 const float SHIP_BUILD_FACTOR = 0.5;
@@ -29,10 +30,15 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
     Frame frame(game);
     auto player = game.me;
 
+    // Get ships
+    std::vector<std::shared_ptr<hlt::Ship>> ships;
+	for (auto& pair : player->ships) {
+        ships.push_back(pair.second);
+    }
+
 	//Make game clone
 	GameClone game_clone(frame);
-	for (auto& pair : player->ships) {
-		auto& ship = pair.second;
+	for (auto ship : ships) {
 		game_clone.advance_game(plans[ship->id], *ship);
 	}
     for (auto other_player : game.players) {
@@ -45,51 +51,66 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         }
     }
 
-    std::unordered_map<hlt::EntityId, hlt::Direction> moves;
-    int num_finished_plans = 0;
+    // Find ships for which to recalculate plans
+    std::unordered_map<hlt::EntityId, int> recalculation_priority;
     for (auto& pair : player->ships) {
-        if (plans[pair.first].is_finished()) { num_finished_plans++; }
-    }
-    auto time_budget = end_time-ms_clock::now();
-        //std::chrono::duration_cast<std::chrono::milliseconds>();
-    auto time_per_plan = time_budget;
-    if (num_finished_plans != 0) { time_per_plan /= num_finished_plans; }
-
-    unsigned int turns_left = hlt::constants::MAX_TURNS-frame.get_game().turn_number;
-    for (auto& pair : player->ships) {
-        auto id = pair.first;
-        auto& ship = pair.second;
-
-        // Create plans if necessary.
+        auto ship = pair.second;
+        int priority = 0;
         if (plans[ship->id].is_finished()) {
-            auto max_depth = std::min(MAX_SEARCH_DEPTH, turns_left-4);
+            priority += 100000;
+        } /*else {
+            auto expected_halite = plans[ship->id].expected_halite();
+            if (expected_halite != -1) {
+                priority += std::abs(expected_halite-ship->halite);
+            }
+        }*/
+        recalculation_priority[ship->id] = priority;
+    }
+    std::sort(ships.begin(), ships.end(),
+        [&recalculation_priority](std::shared_ptr<hlt::Ship>& a, std::shared_ptr<hlt::Ship>& b) {
+            return recalculation_priority[a->id] > recalculation_priority[b->id];
+        });
 
-            auto now = ms_clock::now();
-            unsigned int defensive_turns = (game.players.size() == 4 ? 150 : 0);
-            //Make path on the map clone
-            auto path = game_clone.get_optimal_path(
-                *ship,
-                player->shipyard->position,
-                now+time_per_plan,
-                max_depth,
-                defensive_turns);
+    // Calculate as many new plans as possible within time constraints
+    unsigned int turns_left = hlt::constants::MAX_TURNS-frame.get_game().turn_number;
+    for (size_t ship_idx = 0; ship_idx < ships.size() && ms_clock::now() < end_time; ship_idx++) {
+        auto& ship = *ships[ship_idx];
 
-            plans[id] = Plan(path.max_per_turn);
-            if (path.max_total.size() > 0) { // Prevents a crash when game is ending
-                auto worth = path.max_per_turn[path.max_per_turn.size()-1].halite;
-                auto per_turn = ((float)worth)/path.max_per_turn.size();
+        auto max_depth = std::min(MAX_SEARCH_DEPTH, turns_left-4);
+        unsigned int defensive_turns = (game.players.size() == 4 ? 150 : 0);
+        game_clone.undo_advancement(plans[ship.id], ship);
+        //Make path on the map clone
+        auto search_path = game_clone.get_optimal_path(
+            ship,
+            player->shipyard->position,
+            end_time,
+            max_depth,
+            defensive_turns);
+
+        // Some number to ensure that the paths are any good
+        if (search_path.search_depth > 80) {
+            bool fresh_plan = plans[ship.id].is_finished();
+            plans[ship.id] = Plan(search_path.path);
+            // Prevents a crash when game is ending
+            // Only calculate ships if its an original path
+            if (search_path.path.size() > 0 && fresh_plan) {
+                auto worth = search_path.path[search_path.path.size()-1].halite;
+                auto per_turn = ((float)worth)/search_path.path.size();
                 auto expected_total = turns_left*per_turn;
                 if (SHIP_BUILD_FACTOR*expected_total < hlt::constants::SHIP_COST) {
                     should_build_ship = false;
                 }
             }
-
-            //Update clone map with current plan
-            game_clone.advance_game(plans[id], *ship);
         }
-        moves[id] = plans[id].next_move();
+        //Update clone map with current plan
+        game_clone.advance_game(plans[ship.id], ship);
     }
 
+    // Get moves from plans, and adjust
+    std::unordered_map<hlt::EntityId, hlt::Direction> moves;
+    for (auto ship : ships) {
+        moves[ship->id] = plans[ship->id].next_move();
+    }
     frame.ensure_moves_possible(moves);
     if (game.players.size() == 4) {
         frame.avoid_enemy_collisions(moves);

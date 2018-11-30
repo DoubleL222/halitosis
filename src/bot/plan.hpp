@@ -13,6 +13,7 @@ struct Plan {
 
     bool is_finished() const;
 
+    hlt::Halite expected_halite() const;
     hlt::Direction next_move() const;
     void advance();
 };

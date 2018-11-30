@@ -26,8 +26,8 @@ using Path = std::vector<hlt::Direction>;
 using SearchPath = std::vector<PathSegment>;
 
 struct OptimalPath {
-    SearchPath max_per_turn;
-    SearchPath max_total;
+    unsigned int search_depth;
+    SearchPath path;
 };
 
 struct SpawnRes {

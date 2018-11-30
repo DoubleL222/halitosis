@@ -19,14 +19,17 @@ struct SearchState {
 
 class GameClone {
 	Frame& frame;
-    std::vector<hlt::Halite> halite;
+    // Number of times that a cell has been mined.
+    std::vector<unsigned int> num_minings;
     // Used to mark cells as unsafe once a certain number of turns has passed.
     std::vector<int> turns_until_occupation;
     std::vector<hlt::PlayerId> structures;
 
 public:
 	GameClone(Frame& frame);
-	void advance_game(Plan& plan, hlt::Ship& ship);
+    // Returns the amount of halite in the ship after executing the plan
+    void advance_game(Plan& plan, hlt::Ship& ship);
+    void undo_advancement(Plan& plan, hlt::Ship& ship);
 
     OptimalPath get_optimal_path(
         hlt::Ship& ship,
@@ -43,6 +46,7 @@ public:
     int height() const;
     hlt::Halite get_halite(hlt::Position pos) const;
     bool has_structure(hlt::Position pos) const;
+    bool has_own_structure(hlt::Position pos, hlt::PlayerId player) const;
     // Check whether the cell has been occupied after the given number of turns.
     bool is_occupied(hlt::Position pos, int depth) const;
 
@@ -56,4 +60,8 @@ private:
         hlt::Position end,
         int max_depth
     ) const;
+
+    // Print a segment of the search states.
+    // Prints up to max_depth grids, with the subgrid from center +- grid_size.
+    void print_state(SearchState* state, int max_depth, hlt::Position center, int grid_size) const;
 };

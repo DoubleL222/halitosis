@@ -4,20 +4,12 @@
 
 GameClone::GameClone(Frame& frame)
   : frame(frame),
-    halite(frame.get_board_size()),
+    num_minings(frame.get_board_size()),
     turns_until_occupation(frame.get_board_size()),
     structures(frame.get_board_size())
 {
-    auto& map = frame.get_game().game_map;
-
     turns_until_occupation.assign(frame.get_board_size(), -1);
-    for (int y=0; y < map->height; y++) {
-        for (int x=0; x < map->width; x++) {
-            hlt::Position pos(x, y);
-            halite[frame.get_index(pos)] = map->at(pos)->halite;
-        }
-    }
-
+    structures.assign(frame.get_board_size(), -1);
     for (auto player : frame.get_game().players) {
         structures[frame.get_index(player->shipyard->position)] = player->id;
         for (auto pair : player->dropoffs) {
@@ -26,18 +18,27 @@ GameClone::GameClone(Frame& frame)
     }
 }
 
+// Approximation, as collecting while full leaves some halite on the map
+// However, this is easier to reverse.
 void GameClone::advance_game(Plan& plan, hlt::Ship& ship) {
     auto current_pos = ship.position;
-    auto current_halite = ship.halite;
-
-	for (size_t i = plan.execution_step; i < plan.path.size(); i++) {
+    for (size_t i = plan.execution_step; i < plan.path.size(); i++) {
         auto move = plan.path[i].direction;
         if (move == hlt::Direction::STILL) {
             auto idx = frame.get_index(current_pos);
-            auto mined_halite = halite[idx]/hlt::constants::EXTRACT_RATIO;
-            auto new_halite = std::min(hlt::constants::MAX_HALITE, current_halite+mined_halite);
-            halite[idx] -= new_halite-current_halite;
-            current_halite = new_halite;
+            num_minings[idx]++;
+        }
+        current_pos = frame.move(current_pos, move);
+    }
+}
+
+void GameClone::undo_advancement(Plan& plan, hlt::Ship& ship) {
+    auto current_pos = ship.position;
+    for (size_t i = plan.execution_step; i < plan.path.size(); i++) {
+        auto move = plan.path[i].direction;
+        if (move == hlt::Direction::STILL) {
+            auto idx = frame.get_index(current_pos);
+            num_minings[idx]--;
         }
         current_pos = frame.move(current_pos, move);
     }
@@ -45,6 +46,25 @@ void GameClone::advance_game(Plan& plan, hlt::Ship& ship) {
 
 void GameClone::set_occupied(hlt::Position pos, int turns) {
     turns_until_occupation[frame.get_index(pos)] = turns;
+}
+
+void GameClone::print_state(
+    SearchState* search_state,
+    int max_depth,
+    hlt::Position center,
+    int grid_size
+) const {
+    for (int depth=0; depth < max_depth; depth++) {
+        for (int y=-grid_size; y <= grid_size; y++) {
+            for (int x=-grid_size; x <= grid_size; x++) {
+                auto pos = frame.move(center, x, y);
+                auto idx = frame.get_depth_index(depth, pos);
+                std::cerr << search_state[idx].visited << " ";
+            }
+            std::cerr << std::endl;
+        }
+        std::cerr << std::endl;
+    }
 }
 
 SearchPath GameClone::get_search_path(
@@ -90,8 +110,8 @@ OptimalPath GameClone::get_optimal_path(
 
     if (max_depth == 0) {
         OptimalPath res;
-        res.max_per_turn = get_search_path(search_state, start, end, 0);
-        res.max_total = get_search_path(search_state, start, end, 0);
+        res.path = get_search_path(search_state, start, end, 0);
+        res.search_depth = 0;
         return res;
     }
 
@@ -117,7 +137,7 @@ OptimalPath GameClone::get_optimal_path(
                 auto current_halite = search_state[cur_idx].halite;
 
                 int sea_halite = 0;
-                if (!is_occupied(pos, search_depth)) {
+                if (!is_occupied(pos, search_depth) && !has_structure(pos)) {
                     if (search_state[cur_idx].board_override.count(pos)) {
                         sea_halite = search_state[cur_idx].board_override[pos];
                     } else {
@@ -177,8 +197,6 @@ OptimalPath GameClone::get_optimal_path(
     }
 
     int best_per_turn_depth = 0;
-    int best_total_depth = 0;
-
     float best_halite_per_turn = 0;
     for (unsigned int depth=1; depth < search_depth; depth++) {
         int idx = frame.get_depth_index(depth, end);
@@ -188,18 +206,9 @@ OptimalPath GameClone::get_optimal_path(
             best_per_turn_depth = depth;
         }
     }
-    auto best_halite = 0;
-    for (unsigned int depth=1; depth < search_depth; depth++) {
-        int idx = frame.get_depth_index(depth, end);
-        auto total_halite = search_state[idx].halite;
-        if (total_halite > best_halite) {
-            best_halite = total_halite;
-            best_total_depth = depth;
-        }
-    }
     OptimalPath res;
-    res.max_per_turn = get_search_path(search_state, start, end, best_per_turn_depth);
-    res.max_total = get_search_path(search_state, start, end, best_total_depth);
+    res.path = get_search_path(search_state, start, end, best_per_turn_depth);
+    res.search_depth = search_depth;
     return res;
 }
 
@@ -212,11 +221,20 @@ int GameClone::height() const {
 }
 
 hlt::Halite GameClone::get_halite(hlt::Position pos) const {
-    return halite[frame.get_index(pos)];
+    auto res = frame.get_game().game_map->at(pos)->halite;
+    auto idx = frame.get_index(pos);
+    for (unsigned int i=0; i < num_minings[idx]; i++) {
+        res -= res/hlt::constants::EXTRACT_RATIO;
+    }
+    return res;
 }
 
 bool GameClone::has_structure(hlt::Position pos) const {
-    return structures[frame.get_index(pos)];
+    return structures[frame.get_index(pos)] != -1;
+}
+
+bool GameClone::has_own_structure(hlt::Position pos, hlt::PlayerId player) const {
+    return structures[frame.get_index(pos)] == player;
 }
 
 bool GameClone::is_occupied(hlt::Position pos, int depth) const {

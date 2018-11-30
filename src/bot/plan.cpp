@@ -24,6 +24,10 @@ bool Plan::is_finished() const {
     return execution_step >= path.size();
 }
 
+hlt::Halite Plan::expected_halite() const {
+    return path[execution_step].halite;
+}
+
 hlt::Direction Plan::next_move() const {
     if (is_finished()) {
         return hlt::Direction::STILL;
