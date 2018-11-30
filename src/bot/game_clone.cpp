@@ -44,6 +44,30 @@ void GameClone::undo_advancement(Plan& plan, hlt::Ship& ship) {
     }
 }
 
+hlt::Halite GameClone::get_expectation(Plan& plan, hlt::Ship& ship) const {
+    auto current_pos = ship.position;
+    auto current_halite = ship.halite;
+    std::unordered_map<hlt::Position, hlt::Halite> halite_override;
+
+    for (size_t i=plan.execution_step; i < plan.path.size(); i++) {
+        auto move = plan.path[i].direction;
+
+        auto sea_halite = halite_override.count(current_pos)
+            ? halite_override.at(current_pos)
+            : get_halite(current_pos);
+        if (move == hlt::Direction::STILL) {
+            auto new_halite = current_halite + sea_halite/hlt::constants::EXTRACT_RATIO;
+            new_halite = std::min(current_halite, hlt::constants::MAX_HALITE);
+            halite_override[current_pos] = sea_halite-(new_halite-current_halite);
+            current_halite = new_halite;
+        } else {
+            current_halite -= sea_halite/hlt::constants::MOVE_COST_RATIO;
+            current_pos = frame.move(current_pos, move);
+        }
+    }
+    return current_halite;
+}
+
 void GameClone::set_occupied(hlt::Position pos, int turns) {
     turns_until_occupation[frame.get_index(pos)] = turns;
 }
@@ -101,12 +125,12 @@ OptimalPath GameClone::get_optimal_path(
     size_t current_turns_underway,
     hlt::Position end,
     time_point end_time,
-    unsigned int max_depth,
+    int max_depth,
     unsigned int defensive_turns
 ) const {
     auto start = ship.position;
     // Avoid segfault when max_depth == 0
-    auto search_state_depth = std::max(max_depth, 1u);
+    auto search_state_depth = std::max(max_depth, 1);
     auto search_state_owned = std::make_unique<SearchState[]>(search_state_depth*frame.get_board_size());
     auto search_state = search_state_owned.get();
 
@@ -114,15 +138,15 @@ OptimalPath GameClone::get_optimal_path(
     search_state[start_idx].halite = ship.halite;
     search_state[start_idx].visited = true;
     search_state[start_idx].board_override = std::unordered_map<hlt::Position, hlt::Halite>();
-    unsigned int search_depth = 0;
+    int search_depth = 0;
     for (
         auto now = ms_clock::now();
         search_depth < max_depth-1 && now < end_time;
         now = ms_clock::now(), search_depth++
     ) {
         unsigned int current_turn = frame.get_game().turn_number+search_depth;
-        int search_dist_x = std::min(search_depth, static_cast<unsigned int>(width())/2);
-        int search_dist_y = std::min(search_depth, static_cast<unsigned int>(height())/2);
+        int search_dist_x = std::min(search_depth, width()/2);
+        int search_dist_y = std::min(search_depth, height()/2);
         for (int dy=-search_dist_y; dy <= search_dist_y; dy++) {
             for (int dx=-search_dist_x; dx <= search_dist_x; dx++) {
                 auto pos = frame.move(start, dx, dy);
@@ -193,7 +217,7 @@ OptimalPath GameClone::get_optimal_path(
 
     int best_per_turn_depth = 0;
     float best_halite_per_turn = 0;
-    for (unsigned int depth=1; depth < search_depth; depth++) {
+    for (int depth=1; depth < search_depth; depth++) {
         int idx = frame.get_depth_index(depth, end);
         float halite_per_turn = ((float)(search_state[idx].halite))/(depth+current_turns_underway);
         if (halite_per_turn > best_halite_per_turn) {

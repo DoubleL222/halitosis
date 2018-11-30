@@ -39,3 +39,7 @@ void Plan::advance() {
     execution_step++;
 }
 
+hlt::Halite Plan::expected_total_halite() const {
+    return path[path.size()-1].halite;
+}
+

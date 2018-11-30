@@ -73,6 +73,11 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
             if (expected_halite != -1) {
                 priority += std::abs(expected_halite-ship->halite);
             }
+            auto expected_total_halite = plans[ship->id].expected_total_halite();
+            if (expected_total_halite != -1) {
+                auto current_expectation = game_clone.get_expectation(plans[ship->id], *ship);
+                priority += std::abs(expected_total_halite-current_expectation);
+            }
         }
         recalculation_priority[ship->id] = priority;
     }

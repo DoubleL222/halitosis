@@ -30,6 +30,7 @@ public:
     // Returns the amount of halite in the ship after executing the plan
     void advance_game(Plan& plan, hlt::Ship& ship);
     void undo_advancement(Plan& plan, hlt::Ship& ship);
+    hlt::Halite get_expectation(Plan& plan, hlt::Ship& ship) const;
 
     OptimalPath get_optimal_path(
         hlt::Ship& ship,
@@ -38,7 +39,7 @@ public:
         size_t current_turns_underway,
         hlt::Position end,
         time_point end_time,
-        unsigned int max_depth,
+        int max_depth,
         // Number of turns in which ships should stay closest to own shipyard.
         unsigned int defensive_turns) const;
 

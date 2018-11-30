@@ -14,6 +14,8 @@ struct Plan {
     bool is_finished() const;
 
     hlt::Halite expected_halite() const;
+    // Get the halite expectation after finishing the plan
+    hlt::Halite expected_total_halite() const;
     hlt::Direction next_move() const;
     void advance();
 };
