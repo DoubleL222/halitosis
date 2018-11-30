@@ -83,11 +83,10 @@ class Mcts:
                 node = self.best_child(node)
 
     def get_current_best_action_node(self):
-        best_child = None
-        for child in self.rootNode.children:
-            if best_child is None or child.totalReward / child.visits > best_child.totalReward / best_child.visits:
-                best_child = child
-        return best_child
+        node = self.rootNode
+        while not node.isTerminal and node.isFullyExpanded:
+            node = self.best_child_by_reward_only(node)
+        return node
 
     # function EXPAND(v)
     #     choose a ∈ untried actions from A(s(v))
@@ -97,25 +96,25 @@ class Mcts:
     #     return v'
 
     def expand(self, node):
-        if self.debug:
-            logging.info("expanding node: " + str(node))
+        if self.debug and not node.depth == 0:
+            logging.info("Expanding node -> depth: " + str(node.depth) + ", action: " + node.action)
+
         # We always expand all possible nodes of a given node immediately.
-        while not node.isFullyExpanded:
-            for action in Mcts.ship_commands:
-                new_node = self.generate_new_node(node, action)
+        for action in Mcts.ship_commands:
+            new_node = self.generate_new_node(node, action)
+            if not self.doMergedSimulations:
+                rewards = self.do_simulation(simulator=self.simulator, default_policy=self.defaultPolicy,
+                                             ship_action_lists=self.compile_new_action_lists_for_individual_run(new_node))
+                new_node.totalReward = rewards.pop(self.shipId, 0)
                 if self.debug:
-                    logging.info("new_node at depth " + str(new_node.depth) + " with action: " + action)
-                if not self.doMergedSimulations:
-                    rewards = self.do_simulation(simulator=self.simulator, default_policy=self.defaultPolicy,
-                                                 ship_action_lists=self.compile_new_action_lists_for_individual_run(new_node))
-                    if self.debug:
-                        logging.info("rewards: " + str(rewards))
-                    new_node.totalReward = rewards.pop(self.shipId, 0)
-                    self.backpropagate(new_node, new_node.totalReward)
-                else:
-                    self.lastGeneratedChildren[action] = new_node
-                node.children.append(new_node)
-                self.lastExpandedNode = node
+                    logging.info("New node reward: " + str(new_node.totalReward))
+                self.backpropagate(new_node, new_node.totalReward)
+            else:
+                self.lastGeneratedChildren[action] = new_node
+            node.children.append(new_node)
+
+        self.lastExpandedNode = node
+        node.isFullyExpanded = True
 
         # Update the current best action list in the main dictionary, but only after simulating and
         # backpropagating all the new child nodes.
@@ -151,6 +150,13 @@ class Mcts:
 
     def generate_new_node(self, parent, action):
         # Create a new tree node with 0 reward.
+        if self.debug:
+            if parent.depth == 0:
+                logging.info("Generating node -> depth " + str(parent.depth+1) + ", action: " + action +
+                             " || parent -> root")
+            else:
+                logging.info("Generating node -> depth " + str(parent.depth+1) + ", action: " + action +
+                             " || parent -> depth: " + str(parent.depth) + ", action: " + parent.action)
         return TreeNode(is_terminal=self.currentTurn + parent.depth + 1 >= self.gameMaxTurns, depth=parent.depth+1,
                         parent=parent, action=action, initial_reward=0)
 
@@ -177,16 +183,17 @@ class Mcts:
 
     @staticmethod
     def do_simulation(simulator=None, default_policy=None, ship_action_lists=None):
-
-        # Do the simulation, using our current game state, and our new action list,
-        # as well as the current best actions for the other ships.
-        # Call Luka's simulation thingy with the state and the given ship_action_trees,
-        # to receive a reward.
-        rewards = simulator.run_simulation(default_policy, ship_action_lists)
-
-        # return self.gameState.function_to_call(ship_action_lists)
+        if simulator is None:
+            rewards = {}
+            for ship_id, action_list in ship_action_lists.items():
+                rewards[ship_id] = random.randrange(1, 10)
+        else:
+            # Do the simulation, using our current game state, and our new action list,
+            # as well as the current best actions for the other ships.
+            # Call Luka's simulation thingy with the state and the given ship_action_trees,
+            # to receive a reward.
+            rewards = simulator.run_simulation(default_policy, ship_action_lists)
         return rewards
-        # return random.randrange(1, 10)
 
     def best_child(self, node):
         best_score = 0.0
@@ -195,6 +202,19 @@ class Mcts:
             exploit = child.totalReward / child.visits
             explore = math.sqrt(2.0 * math.log(node.visits) / float(child.visits))
             score = exploit + self.explorationConstant * explore
+            if score == best_score:
+                best_children.append(child)
+            if score > best_score:
+                best_children = [child]
+                best_score = score
+        return random.choice(best_children)
+
+    # Used only to find the current best action, to make an action list from.
+    def best_child_by_reward_only(self, node):
+        best_score = 0.0
+        best_children = []
+        for child in node.children:
+            score = child.totalReward / child.visits
             if score == best_score:
                 best_children.append(child)
             if score > best_score:
@@ -224,17 +244,16 @@ class Mcts:
             node = node.parent
         return
 
-    def generate_graph(self):
-        a = 1
-        #g = Digraph('G', filename='mcts_graph' + str(random.randint(0, 10000)) + '.gv')
-        #g.node("root", label="Root")
-        #self.recursive_graph_node(g, self.rootNode, "root", "r")
-        #g.view()
-
-    def recursive_graph_node(self, g, node, parent_name, parent_action):
-        for child in node.children:
-            node_name = str(child.depth - 1) + parent_action + "->" + str(child.depth) + child.action
-            node_label = "a: " + child.action + ", s:" + "{:.2f}".format(child.totalReward / child.visits) + ", v:" + str(child.visits)
-            g.node(node_name, label=node_label)
-            g.edge(parent_name, node_name)
-            self.recursive_graph_node(g, child, node_name, child.action)
+    # def generate_graph(self):
+    #     g = Digraph('G', filename='mcts_graph' + str(random.randint(0, 10000)) + '.gv')
+    #     g.node("root", label="Root")
+    #     self.recursive_graph_node(g, self.rootNode, "root", "r")
+    #     g.view()
+    #
+    # def recursive_graph_node(self, g, node, parent_name, parent_action):
+    #     for child in node.children:
+    #         node_name = str(child.depth - 1) + parent_action + "->" + str(child.depth) + child.action
+    #         node_label = "a: " + child.action + ", s:" + "{:.2f}".format(child.totalReward / child.visits) + ", v:" + str(child.visits)
+    #         g.node(node_name, label=node_label)
+    #         g.edge(parent_name, node_name)
+    #         self.recursive_graph_node(g, child, node_name, child.action)

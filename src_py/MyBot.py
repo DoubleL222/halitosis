@@ -75,6 +75,11 @@ while True:
 
     sim = simulated_game.GameSimulator(game)
     default_policy = random_bot.RandomBot(sim.game_copy, me.id)
+
+    # For running the game with no simulator, and just getting random rewards instead.
+    # sim = None
+    # default_policy = None
+
     # start = timeit.default_timer()
     # sim.run_simulation(default_policy)
     #
@@ -95,11 +100,11 @@ while True:
     # Timestamp = current time + time limit (all values are in seconds and are floats)
     do_merged_simulations = True
     use_best_action_list_for_other_ships = True
-    max_iterations = 100
+    max_iterations = 100000
     num_iterations_done = 0
-    time_limit = time.time() + 1.0
+    start_time = time.time()
+    time_limit = start_time + 1.0
     last_iteration_time = 0.0
-    full_time = 0.0
 
     # Reset best action lists
     mcts.Mcts.ship_best_action_lists = {}
@@ -114,10 +119,18 @@ while True:
                                       simulator=sim, default_policy=default_policy))
 
     while True:
+        if num_iterations_done >= max_iterations:
+            if debugging:
+                logging.info("Maximum MCTS iterations reached!")
+            break
+
         iteration_start_time = time.time()
+
         # Use last iteration's time spent, to approximate the amount of time we would spend on the next iteration,
         # and if we would exceed the allotted time_limit, break before doing anything.
         if iteration_start_time + last_iteration_time >= time_limit:
+            if debugging:
+                logging.info("MCTS time ran out!")
             break
 
         for mcts_runner in mcts_runners:
@@ -125,14 +138,20 @@ while True:
 
         if do_merged_simulations:
             for action in mcts.Mcts.ship_commands:
+                if debugging:
+                    logging.info("Doing merged simulation for action " + action + "...")
                 ship_action_lists = {}
                 for mcts_runner in mcts_runners:
                     ship_action_lists[mcts_runner.shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
 
                 rewards = mcts.Mcts.do_simulation(default_policy=default_policy, simulator=sim, ship_action_lists=ship_action_lists)
 
+                if debugging:
+                    for ship_id, reward in rewards.items():
+                        logging.info("Ship " + str(ship_id) + " reward: " + str(reward))
+
                 for mcts_runner in mcts_runners:
-                    child_node = mcts_runner.lastGeneratedChildren.my_dict.pop(action, None)
+                    child_node = mcts_runner.lastGeneratedChildren.pop(action, None)
                     if child_node is not None:
                         child_node.totalReward = rewards[mcts_runner.shipId]
                         mcts_runner.backpropagate(child_node, child_node.totalReward)
@@ -141,16 +160,17 @@ while True:
                 mcts_runner.update_ship_best_action_list()
 
         last_iteration_time = time.time() - iteration_start_time
-        full_time += last_iteration_time
+
+        if debugging:
+            logging.info("MCTS iteration time: " + str(last_iteration_time) + " Total time spent: " + str(time.time() - start_time) +
+                         "\n-------------------------------------------------------------------------------------")
+
         num_iterations_done += 1
-        if num_iterations_done >= max_iterations:
-            break
 
     if debugging:
-        logging.info("MCTS ran for " + str(num_iterations_done) + " iterations. Took " + str(full_time) + " seconds in total.")
-        if game.turn_number == 20:
-            a = 1
-            #mcts_runners[0].generate_graph()
+        logging.info("MCTS ran for " + str(num_iterations_done) + " iterations. Took " + str(time.time() - start_time) + " seconds in total.")
+        # if game.turn_number == 10:
+        #     mcts_runners[0].generate_graph()
 
     action_list_dict = mcts.Mcts.ship_best_action_lists
     for ship in me.get_ships():
@@ -169,12 +189,12 @@ while True:
             if debugging:
                 logging.info("Ship is doing MCTS action: " + action)
         else:
-            action = random.choice([Direction.North, Direction.South, Direction.East, Direction.West])
+            action = ship.move(random.choice([Direction.North, Direction.South, Direction.East, Direction.West]))
             if debugging:
                 logging.info("Ship is doing random action: " + action)
 
         # Append the chosen action to the command queue.
-        command_queue.append(ship.move(action))
+        command_queue.append(action)
 
     # --------------------------------------------------------
     # MCTS - END
