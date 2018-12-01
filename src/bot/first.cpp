@@ -9,22 +9,27 @@ hlt::Game FirstBot::advance_game(hlt::Game& game, std::vector<hlt::Command> move
 	return hlt::Game();
 }
 
-FirstBot::FirstBot(unsigned int seed)
-  : rng(seed),
+FirstBotArgs::FirstBotArgs()
+      : name("FirstBot"),
+        max_turns(-1),
+        max_search_depth(120),
+        ship_build_factor(0.5),
+        simulate_enemy_enabled(true),
+        recalculate_paths_enabled(true),
+        avoid_enemy_collisions_enabled(true)
+    {
+    }
+
+FirstBot::FirstBot(FirstBotArgs args)
+  : args(args),
     should_build_ship(true)
 {
 }
 
 void FirstBot::init(hlt::Game& game) {
     // Last thing to call
-    game.ready("Updated");
+    game.ready(args.name);
 }
-
-// Max depth used by get_optimal_path
-const int MAX_SEARCH_DEPTH = 120;
-// Assume that a new ship will collect halite at this rate compared to the most recent ship for
-// the rest of the game.
-const float SHIP_BUILD_FACTOR = 0.5;
 
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_time) {
     Frame frame(game);
@@ -34,6 +39,18 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
     std::vector<std::shared_ptr<hlt::Ship>> ships;
 	for (auto& pair : player->ships) {
         ships.push_back(pair.second);
+    }
+
+    // Forcibly terminate the bot once a number of turns has passed if set.
+    if (args.max_turns != -1 && game.turn_number > args.max_turns) {
+        hlt::Halite halite_on_ships = 0;
+        for (auto ship : ships) {
+            halite_on_ships += ship->halite;
+        }
+        std::cerr << "Player " << player->id << ": " <<
+            "collected=" << player->halite <<
+            "on ships=" << halite_on_ships << std::endl;
+        throw ("die");
     }
 
     // Update turns underway
@@ -51,12 +68,16 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
 	for (auto ship : ships) {
 		game_clone.advance_game(plans[ship->id], *ship);
 	}
-    for (auto other_player : game.players) {
-        if (other_player->id != player->id) {
-            for (auto ship : other_player->ships) {
-                auto simulated_target = game_clone.find_close_halite(ship.second->position);
-                auto dist = game.game_map->calculate_distance(ship.second->position, simulated_target);
-                game_clone.set_occupied(simulated_target, dist);
+    // Simulate some move that the opponent will make
+    if (args.simulate_enemy_enabled) {
+        for (auto other_player : game.players) {
+            if (other_player->id != player->id) {
+                for (auto ship : other_player->ships) {
+                    auto simulated_target = game_clone.find_close_halite(ship.second->position);
+                    auto dist =
+                        game.game_map->calculate_distance(ship.second->position, simulated_target);
+                    game_clone.set_occupied(simulated_target, dist);
+                }
             }
         }
     }
@@ -68,7 +89,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         int priority = 0;
         if (plans[ship->id].is_finished()) {
             priority += 100000;
-        } else {
+        } else if (args.recalculate_paths_enabled) {
             auto expected_halite = plans[ship->id].expected_halite();
             if (expected_halite != -1) {
                 priority += std::abs(expected_halite-ship->halite);
@@ -92,7 +113,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         auto& ship = *ships[ship_idx];
         if (recalculation_priority[ship.id] == 0) { break; }
 
-        auto max_depth = std::min(MAX_SEARCH_DEPTH, turns_left-4);
+        auto max_depth = std::max(std::min(args.max_search_depth, turns_left-4), 0);
         unsigned int defensive_turns = (game.players.size() == 4 ? 150 : 0);
         game_clone.undo_advancement(plans[ship.id], ship);
 
@@ -116,7 +137,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
                 auto worth = search_path.path[search_path.path.size()-1].halite;
                 auto per_turn = ((float)worth)/(search_path.path.size()+turns_underway);
                 auto expected_total = turns_left*per_turn;
-                if (SHIP_BUILD_FACTOR*expected_total < hlt::constants::SHIP_COST) {
+                if (args.ship_build_factor*expected_total < hlt::constants::SHIP_COST) {
                     should_build_ship = false;
                 }
             }
@@ -131,7 +152,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         moves[ship->id] = plans[ship->id].next_move();
     }
     frame.ensure_moves_possible(moves);
-    if (game.players.size() == 4) {
+    if (args.avoid_enemy_collisions_enabled) {
         frame.avoid_enemy_collisions(moves);
     }
 
