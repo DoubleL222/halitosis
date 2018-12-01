@@ -107,6 +107,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
             return recalculation_priority[a->id] > recalculation_priority[b->id];
         });
 
+    std::cerr << "turn: " << frame.get_game().turn_number << std::endl;
     // Calculate as many new plans as possible within time constraints
     int turns_left = hlt::constants::MAX_TURNS-frame.get_game().turn_number;
     for (size_t ship_idx = 0; ship_idx < ships.size() && ms_clock::now() < end_time; ship_idx++) {
@@ -132,6 +133,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         if (search_path.search_depth > 80 && search_path.path.size() > 0) {
             bool fresh_plan = plans[ship.id].is_finished();
             plans[ship.id] = Plan(search_path.path);
+            std::cerr << "created plan for " << ship.id << ": " << plans[ship.id] << std::endl;
             // Only calculate worth if its an original path
             if (fresh_plan) {
                 auto worth = search_path.path[search_path.path.size()-1].halite;

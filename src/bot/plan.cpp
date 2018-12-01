@@ -43,3 +43,11 @@ hlt::Halite Plan::expected_total_halite() const {
     return path[path.size()-1].halite;
 }
 
+std::ostream& operator<<(std::ostream& os, const Plan& val) {
+    os << "[ ";
+    for (auto segment : val.path) {
+        os << segment.direction << " ";
+    }
+    os << "]";
+    return os;
+}

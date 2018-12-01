@@ -18,4 +18,6 @@ struct Plan {
     hlt::Halite expected_total_halite() const;
     hlt::Direction next_move() const;
     void advance();
+
+    friend std::ostream& operator<<(std::ostream& os, const Plan& grid);
 };
