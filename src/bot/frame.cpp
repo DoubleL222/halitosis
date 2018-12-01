@@ -401,3 +401,8 @@ int Frame::get_total_halite_in_cells_within_radius(const hlt::Position& center, 
 	}
 	return total;
 }
+
+bool Frame::ship_at(hlt::Position pos) const {
+    // Seems like it cant be implicitly casted when returning
+    return game.game_map->at(pos)->ship ? true : false;
+}

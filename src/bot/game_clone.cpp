@@ -174,28 +174,30 @@ OptimalPath GameClone::get_optimal_path(
                 if (halite_after_move >= 0) {
                     for (auto direction : hlt::ALL_CARDINALS) {
                         auto new_pos = frame.move(pos, direction);
-                        auto my_id = frame.get_game().my_id;
-                        bool defensive_move = (frame.get_closest_shipyard(new_pos) == my_id);
-                        if (current_turn >= defensive_turns || defensive_move) {
-                            int new_idx = frame.get_depth_index(search_depth+1, new_pos);
+                        if (search_depth != 0 || !frame.ship_at(new_pos)) {
+                            auto my_id = frame.get_game().my_id;
+                            bool defensive_move = (frame.get_closest_shipyard(new_pos) == my_id);
+                            if (current_turn >= defensive_turns || defensive_move) {
+                                int new_idx = frame.get_depth_index(search_depth+1, new_pos);
 
-                            bool update = should_update_search(
-                                search_state[cur_idx],
-                                halite_after_move,
-                                search_state[new_idx]);
-                            if (update) {
-                                search_state[new_idx].board_override
-                                    = search_state[cur_idx].board_override;
-                                search_state[new_idx].in_direction = direction;
-                                search_state[new_idx].visited = true;
-                                search_state[new_idx].halite = halite_after_move;
+                                bool update = should_update_search(
+                                    search_state[cur_idx],
+                                    halite_after_move,
+                                    search_state[new_idx]);
+                                if (update) {
+                                    search_state[new_idx].board_override
+                                        = search_state[cur_idx].board_override;
+                                    search_state[new_idx].in_direction = direction;
+                                    search_state[new_idx].visited = true;
+                                    search_state[new_idx].halite = halite_after_move;
+                                }
                             }
                         }
                     }
                 }
                 // Gathering
                 int new_idx = frame.get_depth_index(search_depth+1, pos);
-                bool update = should_update_search(
+                bool update = search_depth != 0 && should_update_search(
                     search_state[cur_idx],
                     halite_after_gather,
                     search_state[new_idx]);

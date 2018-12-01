@@ -75,6 +75,8 @@ public:
 
 	int get_total_halite_in_cells_within_radius(const hlt::Position& center, const int radius, const DistanceMeasure distanceMeasure = DistanceMeasure::MANHATTAN);
 
+    bool ship_at(hlt::Position pos) const;
+
     // Retrieve the number of cells on the board
     unsigned int get_board_size() const;
 
