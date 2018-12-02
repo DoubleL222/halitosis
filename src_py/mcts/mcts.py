@@ -196,17 +196,19 @@ class Mcts:
         return rewards
 
     def best_child(self, node):
-        best_score = 0.0
+        best_score = -1.0
         best_children = []
         for child in node.children:
             exploit = child.totalReward / child.visits
             explore = math.sqrt(2.0 * math.log(node.visits) / float(child.visits))
             score = exploit + self.explorationConstant * explore
-            if score == best_score:
-                best_children.append(child)
             if score > best_score:
                 best_children = [child]
                 best_score = score
+            if math.isclose(score, best_score, rtol=1e-05, atol=1e-08):
+                best_children.append(child)
+        if len(best_children) == 0:
+            return random.choice(node.children)
         return random.choice(best_children)
 
     # Used only to find the current best action, to make an action list from.
