@@ -195,11 +195,11 @@ while True:
         if ship.id in action_list_dict:
             action = action_list_dict[ship.id][0]
             if debugging:
-                logging.info("Ship is doing MCTS action: " + action)
+                logging.info("Ship " + str(ship.id) + " is doing MCTS action: " + action)
         else:
             action = ship.move(random.choice([Direction.North, Direction.South, Direction.East, Direction.West]))
             if debugging:
-                logging.info("Ship is doing random action: " + action)
+                logging.info("Ship " + str(ship.id) + " is doing random action: " + action)
 
         # Append the chosen action to the command queue.
         command_queue.append(action)

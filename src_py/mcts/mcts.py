@@ -97,7 +97,7 @@ class Mcts:
 
     def expand(self, node):
         if self.debug and not node.depth == 0:
-            logging.info("Expanding node -> depth: " + str(node.depth) + ", action: " + node.action)
+            logging.info("Ship " + self.shipId + " -> Ship " + self.shipId + " - Expanding node -> depth: " + str(node.depth) + ", action: " + node.action)
 
         # We always expand all possible nodes of a given node immediately.
         for action in Mcts.ship_commands:
@@ -107,7 +107,7 @@ class Mcts:
                                              ship_action_lists=self.compile_new_action_lists_for_individual_run(new_node))
                 new_node.totalReward = rewards.pop(self.shipId, 0)
                 if self.debug:
-                    logging.info("New node reward: " + str(new_node.totalReward))
+                    logging.info("Ship " + self.shipId + " -> New node reward: " + str(new_node.totalReward))
                 self.backpropagate(new_node, new_node.totalReward)
             else:
                 self.lastGeneratedChildren[action] = new_node
@@ -152,10 +152,10 @@ class Mcts:
         # Create a new tree node with 0 reward.
         if self.debug:
             if parent.depth == 0:
-                logging.info("Generating node -> depth " + str(parent.depth+1) + ", action: " + action +
+                logging.info("Ship " + self.shipId + " -> Generating node -> depth " + str(parent.depth+1) + ", action: " + action +
                              " || parent -> root")
             else:
-                logging.info("Generating node -> depth " + str(parent.depth+1) + ", action: " + action +
+                logging.info("Ship " + self.shipId + " -> Generating node -> depth " + str(parent.depth+1) + ", action: " + action +
                              " || parent -> depth: " + str(parent.depth) + ", action: " + parent.action)
         return TreeNode(is_terminal=self.currentTurn + parent.depth + 1 >= self.gameMaxTurns, depth=parent.depth+1,
                         parent=parent, action=action, initial_reward=0)
@@ -169,15 +169,15 @@ class Mcts:
 
         # Create a new action list for this ship, with the given action as the first action.
         if self.debug:
-            logging.info("node.action: " + str(node.action))
+            logging.info("Ship " + self.shipId + " -> node.action: " + str(node.action))
         new_ship_action_tree = self.get_specific_action_list(node.action, node.parent)
         if self.debug:
-            logging.info("new_ship_action_tree: " + str(new_ship_action_tree))
+            logging.info("Ship " + self.shipId + " -> new_ship_action_tree: " + str(new_ship_action_tree))
 
         # Replace our ship's current action list (in the copy) with our new action list.
         temp_ship_best_action_lists[self.shipId] = new_ship_action_tree
         if self.debug:
-            logging.info("temp_ship_best_action_lists: " + str(temp_ship_best_action_lists))
+            logging.info("Ship " + self.shipId + " -> temp_ship_best_action_lists: " + str(temp_ship_best_action_lists))
 
         return temp_ship_best_action_lists
 
@@ -196,17 +196,19 @@ class Mcts:
         return rewards
 
     def best_child(self, node):
-        best_score = 0.0
+        best_score = -1.0
         best_children = []
         for child in node.children:
             exploit = child.totalReward / child.visits
             explore = math.sqrt(2.0 * math.log(node.visits) / float(child.visits))
             score = exploit + self.explorationConstant * explore
-            if score == best_score:
-                best_children.append(child)
             if score > best_score:
                 best_children = [child]
                 best_score = score
+            if math.isclose(score, best_score, rtol=1e-05, atol=1e-08):
+                best_children.append(child)
+        if len(best_children) == 0:
+            return random.choice(node.children)
         return random.choice(best_children)
 
     # Used only to find the current best action, to make an action list from.
