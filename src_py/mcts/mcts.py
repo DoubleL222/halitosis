@@ -196,6 +196,9 @@ class Mcts:
         return rewards
 
     def best_child(self, node):
+        if self.debug and node.children is None:
+            logging.info("Ship " + str(self.shipId) + " -> node.children is None! depth: "
+                         + node.depth + ", action: " + node.action)
         best_score = -1.0
         best_children = []
         for child in node.children:
@@ -208,6 +211,8 @@ class Mcts:
             if math.isclose(a=score, b=best_score):
                 best_children.append(child)
         if len(best_children) == 0:
+            if self.debug:
+                logging.info("Ship " + str(self.shipId) + " -> Could not find best child!")
             return random.choice(node.children)
         return random.choice(best_children)
 
