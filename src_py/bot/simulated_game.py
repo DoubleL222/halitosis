@@ -38,8 +38,9 @@ class GameSimulator:
         self.search_depth = to_search_depth
 
         if isinstance(game_to_copy, hlt.Game):
-            self.original_game = copy.deepcopy(game_to_copy)
-            self.original_game.players = copy.deepcopy(game_to_copy.players)
+            self.original_game = game_to_copy
+        #    self.original_game = copy.deepcopy(game_to_copy)
+        #    self.original_game.players = copy.deepcopy(game_to_copy.players)
 
         # Setting shipyard position cells halite to 0
         for curr_player_id in self.original_game.players:
@@ -59,12 +60,20 @@ class GameSimulator:
         self.deep_copy_time_sum = end-start
         self.advance_game_time_sum = 0
         self.bot_time_sum = 0
+        self.map_cleanup_sum = 0
+        self.executing_moves_sum = 0
+
+        # Cells to clean at the end of advance game
+        self.cells_to_clean = []
 
     def reset_simulator(self):
         self.game_copy = copy.deepcopy(self.original_game)
         self.game_copy.players = copy.deepcopy(self.original_game.players)
         self.advance_game_time_sum = 0
         self.bot_time_sum = 0
+        self.map_cleanup_sum = 0
+        self.executing_moves_sum = 0
+        self.cells_to_clean = []
         self.init_ship_scores()
 
     def init_ship_scores(self):
@@ -115,9 +124,11 @@ class GameSimulator:
 
     def clean_map(self):
         # Reset necessary map cells members
-        for i in range(len(self.game_copy.game_map.get_cells())):
-            for j in range(len(self.game_copy.game_map.get_cells()[i])):
-                current_cell = self.game_copy.game_map.get_cells()[i][j]
+        # for i in range(len(self.game_copy.game_map.get_cells())):
+        #    for j in range(len(self.game_copy.game_map.get_cells()[i])):
+        for position in self.cells_to_clean:
+                #current_cell = self.game_copy.game_map.get_cells()[i][j]
+                current_cell = self.game_copy.game_map[position]
                 ship_queue = self.game_copy.game_map.get_cell_ship_queue(current_cell.position)
                 # If only one ship entering/staying in cell put it there
                 if len(ship_queue) == 1:
@@ -133,7 +144,8 @@ class GameSimulator:
                 # Clear ship queue for cell
                 self.game_copy.game_map.clear_ship_queue(current_cell.position)
 
-                #self.game_copy.game_map.set_cell_occupied_this_round(i, j, False)
+        self.cells_to_clean = []
+        #self.game_copy.game_map.set_cell_occupied_this_round(i, j, False)
 
     def advance_game(self, commands, player_id, ship_moves={}):
         # Profiling
@@ -161,6 +173,8 @@ class GameSimulator:
                     self.game_copy.players[current_player.id].add_player_halite(-constants.SHIP_COST)
                     # Add ship to cell queue
                     self.game_copy.game_map.add_ship_to_cell_queue(current_player.shipyard.position, self.game_copy.players[current_player.id].get_ship(new_ship.id))
+                    # Add cell position to cleaning list
+                    self.cells_to_clean.append(current_player.shipyard.position)
                 else:
                     if self.do_debug:
                         # Log warning if current_player does not have enough money for generating new ship
@@ -231,6 +245,8 @@ class GameSimulator:
 
                             # Put ship in queue for next cell
                             self.game_copy.game_map.add_ship_to_cell_queue(current_ship.position, self.game_copy.players[current_player.id].get_ship(current_ship.id))
+                            # Add cell position to cleanup map
+                            self.cells_to_clean.append(current_ship.position)
 
                             # Check if ship going to shipyard and deploy Halite
                             if current_ship.position == self.game_copy.players[current_player.id].shipyard.position:
@@ -276,9 +292,13 @@ class GameSimulator:
                         self.game_copy.players[current_player.id].add_ship_halite(current_ship.id, gather_amount)
                         # Decrease cell halite
                         self.game_copy.game_map.add_cell_halite(current_ship.position, -gather_amount)
+
                         # Add ship to queue for same cell
                         self.game_copy.game_map.add_ship_to_cell_queue(current_ship.position, self.game_copy.players[
                             current_player.id].get_ship(current_ship.id))
+                        # Add cell position to cleanup map
+                        self.cells_to_clean.append(current_ship.position)
+
                         # Remove ship from current cell
                         self.game_copy.game_map.remove_ship_from_cell(current_cell.position)
                         # Add score for ship (Monte carlo reward)
@@ -296,12 +316,18 @@ class GameSimulator:
                 # TODO implement consturc dropoff
                 print("Make dropoff")
 
+        # Profiling
+        end = timeit.default_timer()
+        self.executing_moves_sum = self.executing_moves_sum + (end - start)
+        # Profiling
+        start = timeit.default_timer()
+
         # Clean up map and do collisions
         self.clean_map()
 
         # Profiling
         end = timeit.default_timer()
-        self.advance_game_time_sum = self.advance_game_time_sum + (end-start)
+        self.map_cleanup_sum = self.map_cleanup_sum + (end - start)
 
     # Run this with the parameter containing the ship moves from monte carlo where the key is an int (ship id) and the value is a LIST of commands
     def run_simulation(self, default_policy_bot, ship_moves={}):
@@ -330,7 +356,9 @@ class GameSimulator:
 
         if self.do_performance_debug:
             bot.profiling.print_ms_message("Deep copy took: ", self.deep_copy_time_sum)
-            bot.profiling.print_ms_message("Simulation took: ", self.advance_game_time_sum)
+            bot.profiling.print_ms_message("Simulation took: ", self.executing_moves_sum + self.map_cleanup_sum)
+            bot.profiling.print_ms_message("Advance moves: ", self.executing_moves_sum)
+            bot.profiling.print_ms_message("Clean Up Map: ", self.map_cleanup_sum)
             bot.profiling.print_ms_message("Bot took: ", self.bot_time_sum)
 
         if self.do_debug:
