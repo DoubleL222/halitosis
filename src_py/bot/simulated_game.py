@@ -1,5 +1,3 @@
-from pip._vendor.pyparsing import oneOf
-
 import hlt
 import copy
 import hlt.player
@@ -9,11 +7,12 @@ from hlt import constants
 import random
 # This library contains direction metadata to better interface with the game.
 from hlt.positionals import Direction
-#Import ship
+#import ship
 from hlt.entity import Ship
 from hlt.game_map import MapCell
 #import logging
 import logging
+import bot.profiling
 
 import timeit
 
@@ -30,7 +29,8 @@ class GameSimulator:
         start = timeit.default_timer()
 
         # Should I debug that
-        self.do_debug = True
+        self.do_debug = False
+        self.do_performance_debug = True
 
         if to_search_depth == -1:
             to_search_depth = hlt.constants.MAX_TURNS
@@ -47,8 +47,7 @@ class GameSimulator:
             self.original_game.game_map.set_cell_halite(curr_player.shipyard.position, 0)
 
         # Init game copy
-        self.game_copy = self.original_game
-        self.game_copy.players = self.original_game.players
+        self.game_copy = None
 
         # Dictionary for keeping ship scores for Monte Carlo
         self.ship_scores = {}
@@ -62,8 +61,8 @@ class GameSimulator:
         self.bot_time_sum = 0
 
     def reset_simulator(self):
-        self.game_copy = self.original_game
-        self.game_copy.players = self.original_game.players
+        self.game_copy = copy.deepcopy(self.original_game)
+        self.game_copy.players = copy.deepcopy(self.original_game.players)
         self.advance_game_time_sum = 0
         self.bot_time_sum = 0
         self.init_ship_scores()
@@ -174,10 +173,16 @@ class GameSimulator:
                 ship_command = split_command[2]
                 # If current_player has this ship
                 if self.game_copy.players[player_id].has_ship(ship_id):
+                    if self.do_debug:
+                        logging.info("All ship moves: " + str(ship_moves))
                     # If we have a command from monte carlo
                     if ship_id in ship_moves:
                         monte_carlo_ship_moves = ship_moves[ship_id]
+                        if self.do_debug:
+                            logging.info("Ship moves: " + str(monte_carlo_ship_moves))
                         if len(monte_carlo_ship_moves) > 0:
+                            if self.do_debug:
+                                logging.info("Ship moves[0]: " + str(monte_carlo_ship_moves[0]))
                             # get mcts ship command
                             ship_command = (monte_carlo_ship_moves[0].split(" "))[2]
                             # Remove the command from the list
@@ -306,7 +311,8 @@ class GameSimulator:
                 # Print map for DEBUGGING
                 self.print_map()
             # Print turn number to log file
-            logging.info("+++++++++ TURN {:03} +++++++++ :SIM".format(self.game_copy.turn_number))
+            if self.do_debug:
+                logging.info("+++++++++ TURN {:03} +++++++++ :SIM".format(self.game_copy.turn_number))
 
             # Profiling - default policy time
             start = timeit.default_timer()
@@ -321,3 +327,12 @@ class GameSimulator:
 
             # Increment turn by one
             self.game_copy.turn_number += 1
+
+        if self.do_performance_debug:
+            bot.profiling.print_ms_message("Deep copy took: ", self.deep_copy_time_sum)
+            bot.profiling.print_ms_message("Simulation took: ", self.advance_game_time_sum)
+            bot.profiling.print_ms_message("Bot took: ", self.bot_time_sum)
+
+        if self.do_debug:
+            logging.info("Turn number: " + str(self.game_copy.turn_number))
+        return self.ship_scores
