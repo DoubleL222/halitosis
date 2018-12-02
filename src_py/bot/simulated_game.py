@@ -26,7 +26,7 @@ class GameSimulator:
     """
     def __init__(self, game_to_copy, to_search_depth=-1):
         # Should I debug that
-        self.do_debug = False
+        self.do_debug = True
         self.do_performance_debug = False
         self.do_warnings = False
         self.generate_new_ships = False
@@ -119,7 +119,7 @@ class GameSimulator:
                     max_id = max_p_id
         return max_id + 1
 
-    def move(self, position, dx, dy):
+    def move(self, position, dy, dx):
         # Get new position based on current position and move direction
         position.x += dx
         position.y += dy
@@ -237,12 +237,16 @@ class GameSimulator:
 
                             # Change position based on direction
                             if split_command[2] == "n":
+                                logging.info("Ship moving north:")
                                 current_ship.position = self.move(current_ship.position, 1, 0)
                             elif split_command[2] == "s":
+                                logging.info("Ship moving south:")
                                 current_ship.position = self.move(current_ship.position, -1, 0)
                             elif split_command[2] == "e":
+                                logging.info("Ship moving east:")
                                 current_ship.position = self.move(current_ship.position, 0, 1)
                             elif split_command[2] == "w":
+                                logging.info("Ship moving west:")
                                 current_ship.position = self.move(current_ship.position, 0, -1)
 
                             # Set new ship position
