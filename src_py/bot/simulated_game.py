@@ -26,9 +26,9 @@ class GameSimulator:
     """
     def __init__(self, game_to_copy, to_search_depth=-1):
         # Should I debug that
-        self.do_debug = True
+        self.do_debug = False
         self.do_performance_debug = False
-        self.do_warnings = True
+        self.do_warnings = False
         self.generate_new_ships = False
 
         if self.do_performance_debug:

@@ -25,7 +25,7 @@ from bot import random_bot
 from bot import simulated_game
 import timeit
 """ <<<Game Begin>>> """
-debugging = False
+debugging = True
 
 # This game object contains the initial game state.
 game = hlt.Game()
@@ -73,7 +73,7 @@ while True:
 
     #SIMULATION
 
-    sim = simulated_game.GameSimulator(game)
+    sim = simulated_game.GameSimulator(game, 20)
     default_policy = random_bot.RandomBot(sim.game_copy, me.id)
 
     # For running the game with no simulator, and just getting random rewards instead.
@@ -144,7 +144,15 @@ while True:
                 for mcts_runner in mcts_runners:
                     ship_action_lists[mcts_runner.shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
 
+                # Profiling
+                start = timeit.default_timer()
+
                 rewards = mcts.Mcts.do_simulation(default_policy=default_policy, simulator=sim, ship_action_lists=ship_action_lists)
+
+                # Profiling
+                end = timeit.default_timer()
+                logging.info("Simulation took: %.3f" % (end-start))
+
 
                 if debugging:
                     for ship_id, reward in rewards.items():

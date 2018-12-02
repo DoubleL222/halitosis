@@ -29,7 +29,7 @@ class Mcts:
     ship_commands = {'n', 's', 'e', 'w', 'o'}
     ship_best_action_lists = {}
 
-    debug = False
+    debug = True
 
     # exploration_constant note: Larger values will increase exploitation, smaller will increase exploration.
     def __init__(self, exploration_constant=1 / math.sqrt(2), game_state=None, ship=None,
