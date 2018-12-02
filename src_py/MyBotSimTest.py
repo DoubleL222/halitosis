@@ -51,7 +51,7 @@ while True:
     #SIMULATION
     start = timeit.default_timer()
 
-    sim = bot.simulated_game.GameSimulator(game, 50)
+    sim = bot.simulated_game.GameSimulator(game, 20)
     default_policy = bot.random_bot.RandomBot(sim.game_copy, me.id)
     sim.run_simulation(default_policy)
     sim.run_simulation(default_policy)

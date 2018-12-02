@@ -25,12 +25,15 @@ class GameSimulator:
     The is a representation of the Game class
     """
     def __init__(self, game_to_copy, to_search_depth=-1):
-        # Profiling
-        start = timeit.default_timer()
-
         # Should I debug that
-        self.do_debug = False
-        self.do_performance_debug = True
+        self.do_debug = True
+        self.do_performance_debug = False
+        self.do_warnings = True
+        self.generate_new_ships = False
+
+        if self.do_performance_debug:
+            # Profiling
+            start = timeit.default_timer()
 
         if to_search_depth == -1:
             to_search_depth = hlt.constants.MAX_TURNS
@@ -53,15 +56,15 @@ class GameSimulator:
         # Dictionary for keeping ship scores for Monte Carlo
         self.ship_scores = {}
 
-        # Profiling
-        end = timeit.default_timer()
-
-        # Profiling sums
-        self.deep_copy_time_sum = end-start
-        self.advance_game_time_sum = 0
-        self.bot_time_sum = 0
-        self.map_cleanup_sum = 0
-        self.executing_moves_sum = 0
+        if self.do_performance_debug:
+            # Profiling
+            end = timeit.default_timer()
+            # Profiling sums
+            self.deep_copy_time_sum = end-start
+            self.advance_game_time_sum = 0
+            self.bot_time_sum = 0
+            self.map_cleanup_sum = 0
+            self.executing_moves_sum = 0
 
         # Cells to clean at the end of advance game
         self.cells_to_clean = []
@@ -69,10 +72,11 @@ class GameSimulator:
     def reset_simulator(self):
         self.game_copy = copy.deepcopy(self.original_game)
         self.game_copy.players = copy.deepcopy(self.original_game.players)
-        self.advance_game_time_sum = 0
-        self.bot_time_sum = 0
-        self.map_cleanup_sum = 0
-        self.executing_moves_sum = 0
+        if self.do_performance_debug:
+            self.advance_game_time_sum = 0
+            self.bot_time_sum = 0
+            self.map_cleanup_sum = 0
+            self.executing_moves_sum = 0
         self.cells_to_clean = []
         self.init_ship_scores()
 
@@ -99,7 +103,7 @@ class GameSimulator:
                 map_cell = self.game_copy.game_map.get_cells()[i][j]
                 print_string += "h: " + str(map_cell.halite_amount)
                 if map_cell.ship is not None:
-                    print_string += ", s: " + str(map_cell.ship.halite_amount)
+                    print_string += ", s(%d): %d " % (map_cell.ship.id ,map_cell.ship.halite_amount)
                 print_string += " || "
             print_string += "\n"
         logging.info(print_string)
@@ -115,12 +119,11 @@ class GameSimulator:
                     max_id = max_p_id
         return max_id + 1
 
-    @staticmethod
-    def move(position, dx, dy):
+    def move(self, position, dx, dy):
         # Get new position based on current position and move direction
         position.x += dx
         position.y += dy
-        return position
+        return self.game_copy.game_map.normalize(position)
 
     def clean_map(self):
         # Reset necessary map cells members
@@ -135,10 +138,10 @@ class GameSimulator:
                     self.game_copy.game_map.add_ship_to_cell(current_cell.position, ship_queue[0])
                 # If more than one ship coming to same cell, destroy all
                 elif len(ship_queue) > 1:
-                    if self.do_debug:
+                    if self.do_warnings:
                         logging.warning("Ships collided on map cell: i: " + str(current_cell.position.x) + ", j: " + str(current_cell.position.y) + "; ships:")
                     for current_ship in ship_queue:
-                        if self.do_debug:
+                        if self.do_warnings:
                             logging.warning("Ship id: " + str(current_ship.id) + ", owner: " + str(current_ship.owner))
                         self.game_copy.players[current_ship.owner].remove_ship(current_ship.id)
                 # Clear ship queue for cell
@@ -148,8 +151,9 @@ class GameSimulator:
         #self.game_copy.game_map.set_cell_occupied_this_round(i, j, False)
 
     def advance_game(self, commands, player_id, ship_moves={}):
-        # Profiling
-        start = timeit.default_timer()
+        if self.do_performance_debug:
+            # Profiling
+            start = timeit.default_timer()
 
         # Get current current_player
         current_player = self.game_copy.players[player_id]
@@ -162,23 +166,24 @@ class GameSimulator:
             # -------------------------BEGIN COMMANDS---------------------------------
             # COMMAND - Generate (spawn ship)
             if split_command[0] == "g":
-                if current_player.halite_amount >= constants.SHIP_COST:
-                    # Get id for newly spawned ship
-                    new_id = self.get_next_ship_id()
-                    # Spawn ship
-                    new_ship = Ship(current_player.id, new_id, current_player.shipyard.position, 0)
-                    # Add ship to current_player
-                    self.game_copy.players[current_player.id].add_ship(new_ship, new_id)
-                    # Reduce current_player halite based on ship cost
-                    self.game_copy.players[current_player.id].add_player_halite(-constants.SHIP_COST)
-                    # Add ship to cell queue
-                    self.game_copy.game_map.add_ship_to_cell_queue(current_player.shipyard.position, self.game_copy.players[current_player.id].get_ship(new_ship.id))
-                    # Add cell position to cleaning list
-                    self.cells_to_clean.append(current_player.shipyard.position)
-                else:
-                    if self.do_debug:
-                        # Log warning if current_player does not have enough money for generating new ship
-                        logging.warning("Player "+str(player_id)+" wanted to build ship, but doesn't have enough halite")
+                if self.generate_new_ships:
+                    if current_player.halite_amount >= constants.SHIP_COST:
+                        # Get id for newly spawned ship
+                        new_id = self.get_next_ship_id()
+                        # Spawn ship
+                        new_ship = Ship(current_player.id, new_id, current_player.shipyard.position, 0)
+                        # Add ship to current_player
+                        self.game_copy.players[current_player.id].add_ship(new_ship, new_id)
+                        # Reduce current_player halite based on ship cost
+                        self.game_copy.players[current_player.id].add_player_halite(-constants.SHIP_COST)
+                        # Add ship to cell queue
+                        self.game_copy.game_map.add_ship_to_cell_queue(current_player.shipyard.position, self.game_copy.players[current_player.id].get_ship(new_ship.id))
+                        # Add cell position to cleaning list
+                        self.cells_to_clean.append(current_player.shipyard.position)
+                    else:
+                        if self.do_warnings:
+                            # Log warning if current_player does not have enough money for generating new ship
+                            logging.warning("Player "+str(player_id)+" wanted to build ship, but doesn't have enough halite")
             # COMMAND - Move ship
             elif split_command[0] == "m":
                 # Get ship id from command
@@ -277,7 +282,7 @@ class GameSimulator:
                         else:
                             failed_to_move = True
                             # Log warning for failed to move
-                            if self.do_debug:
+                            if self.do_warnings:
                                 logging.warning(str(ship_id) +" has "+ str(current_ship.halite_amount))
                                 logging.warning("Player " + str(player_id) + " wanted to move ship " + str(ship_id) + ", but doesn't have enough halite")
 
@@ -306,7 +311,7 @@ class GameSimulator:
 
                 # If current_player does not have this ship we write a warning to log file
                 else:
-                    if self.do_debug:
+                    if self.do_warnings:
                         logging.warning(
                             "Player " + str(player_id) + " wanted to move ship "+str(ship_id)+", but doesn't have it")
                         logging.warning(str(self.game_copy.players[player_id].get_ships_dict()))
@@ -316,18 +321,20 @@ class GameSimulator:
                 # TODO implement consturc dropoff
                 print("Make dropoff")
 
-        # Profiling
-        end = timeit.default_timer()
-        self.executing_moves_sum = self.executing_moves_sum + (end - start)
-        # Profiling
-        start = timeit.default_timer()
+        if self.do_performance_debug:
+            # Profiling
+            end = timeit.default_timer()
+            self.executing_moves_sum = self.executing_moves_sum + (end - start)
+            # Profiling
+            start = timeit.default_timer()
 
         # Clean up map and do collisions
         self.clean_map()
 
-        # Profiling
-        end = timeit.default_timer()
-        self.map_cleanup_sum = self.map_cleanup_sum + (end - start)
+        if self.do_performance_debug:
+            # Profiling
+            end = timeit.default_timer()
+            self.map_cleanup_sum = self.map_cleanup_sum + (end - start)
 
     # Run this with the parameter containing the ship moves from monte carlo where the key is an int (ship id) and the value is a LIST of commands
     def run_simulation(self, default_policy_bot, ship_moves={}):
@@ -340,13 +347,16 @@ class GameSimulator:
             if self.do_debug:
                 logging.info("+++++++++ TURN {:03} +++++++++ :SIM".format(self.game_copy.turn_number))
 
-            # Profiling - default policy time
-            start = timeit.default_timer()
+            if self.do_performance_debug:
+                # Profiling - default policy time
+                start = timeit.default_timer()
             # Run default policy
             returns = default_policy_bot.run(self.game_copy)
-            # Profiling end and add to sum
-            end = timeit.default_timer()
-            self.bot_time_sum = self.bot_time_sum + (end - start)
+
+            if self.do_performance_debug:
+                # Profiling end and add to sum
+                end = timeit.default_timer()
+                self.bot_time_sum = self.bot_time_sum + (end - start)
 
             # Advance game based on returns of the bot
             self.advance_game(returns[0], returns[1], ship_moves)
