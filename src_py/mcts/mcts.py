@@ -20,7 +20,12 @@ class TreeNode:
         self.action = action
         self.totalReward = initial_reward
 
-        self.isFullyExpanded = self.isTerminal
+        self.isFullyExpanded = False
+        # Since we do everything within the expand function, or manually from outside when doing merged simulations,
+        # we don't care whether a node is terminal. I've commented this out since we don't need it, AND it was giving
+        # an error when using doMergedSimulations, since we always expand the node, even if it's terminal, just to
+        # keep the code for producing the action lists for the simulator simple.
+        # self.isFullyExpanded = self.isTerminal
         self.visits = 0
         self.children = []
 
@@ -208,12 +213,11 @@ class Mcts:
             if score > best_score:
                 best_children = [child]
                 best_score = score
-            if math.isclose(a=score, b=best_score):
+            if math.isclose(score, best_score):
                 best_children.append(child)
         if len(best_children) == 0:
             if self.debug:
                 logging.info("Ship " + str(self.shipId) + " -> Could not find best child!")
-            return random.choice(node.children)
         return random.choice(best_children)
 
     # Used only to find the current best action, to make an action list from.
@@ -222,12 +226,15 @@ class Mcts:
         best_children = []
         for child in node.children:
             score = child.totalReward / child.visits
-            if score == best_score:
-                best_children.append(child)
             if score > best_score:
                 best_children = [child]
                 best_score = score
+            if math.isclose(score, best_score):
+                best_children.append(child)
         return random.choice(best_children)
+
+    def get_best_action(self):
+        return self.best_child_by_reward_only(self.rootNode).action
 
     # function BESTCHILD(v, c)
     # return (big calculation)
