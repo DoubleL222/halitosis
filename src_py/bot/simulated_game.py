@@ -91,16 +91,19 @@ class GameSimulator:
             # Create ship dictionary for keeping score
             for current_ship in curr_player.get_ships():
                 self.ship_scores[current_ship.id] = 0
+                if self.do_debug:
+                    logging.info("Player %d, has ship %d" % (curr_player_id, current_ship.id))
 
     def add_halite_score_to_ship(self, ship_id, halite):
+        logging.info("Added %d halite for ship scores id: %d" % (halite, ship_id))
         if ship_id in self.ship_scores:
             self.ship_scores[ship_id] += halite
 
     def print_map(self):
         #Iterate through all cells and print contents
         print_string = "\n"
-        for y in range(self.game_copy.game_map.width):
-            for x in range(self.game_copy.game_map.height):
+        for y in range(self.game_copy.game_map.height):
+            for x in range(self.game_copy.game_map.width):
                 pos = Position(x, y)
                 map_cell = self.game_copy.game_map[pos]
                 print_string += "h: " + str(map_cell.halite_amount)
@@ -124,7 +127,7 @@ class GameSimulator:
     def move(self, position, dx, dy):
         # Get new position based on current position and move direction
         position.x += dx
-        position.y -= dy
+        position.y += dy
         return self.game_copy.game_map.normalize(position)
 
     def clean_map(self):
@@ -240,19 +243,19 @@ class GameSimulator:
                             # Change position based on direction
                             if split_command[2] == "n":
                                 if self.do_debug:
-                                    logging.info("Ship moving north")
-                                current_ship.position = self.move(current_ship.position, 0, 1)
+                                    logging.info("Ship %d moving north", current_ship.id)
+                                current_ship.position = self.move(current_ship.position, 0, -1)
                             elif split_command[2] == "s":
                                 if self.do_debug:
-                                    logging.info("Ship moving south")
-                                current_ship.position = self.move(current_ship.position, 0, -1)
+                                    logging.info("Ship %d moving south", current_ship.id)
+                                current_ship.position = self.move(current_ship.position, 0, 1)
                             elif split_command[2] == "e":
                                 if self.do_debug:
-                                    logging.info("Ship moving east")
+                                    logging.info("Ship %d moving east", current_ship.id)
                                 current_ship.position = self.move(current_ship.position, 1, 0)
                             elif split_command[2] == "w":
                                 if self.do_debug:
-                                    logging.info("Ship moving west")
+                                    logging.info("Ship %d moving west", current_ship.id)
                                 current_ship.position = self.move(current_ship.position, -1, 0)
 
                             # Set new ship position
@@ -299,7 +302,7 @@ class GameSimulator:
                     # COMMAND - Stay (mine) or if ship failed to move
                     if ship_command == "o" or failed_to_move:
                         if self.do_debug:
-                            logging.info("Ship staying still")
+                            logging.info("Ship %d staying still", current_ship.id)
                         # Amount ship will gather
                         gather_amount = int(round((1/constants.EXTRACT_RATIO) * current_cell.halite_amount))
                         # Check if gather amount would go over ship maximum
