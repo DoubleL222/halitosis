@@ -73,7 +73,7 @@ while True:
 
     #SIMULATION
 
-    sim = simulated_game.GameSimulator(game, 20)
+    sim = simulated_game.GameSimulator(game, 2)
     default_policy = random_bot.RandomBot(sim.game_copy, me.id)
 
     # For running the game with no simulator, and just getting random rewards instead.
