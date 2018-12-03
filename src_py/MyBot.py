@@ -26,6 +26,7 @@ from bot import simulated_game
 import timeit
 """ <<<Game Begin>>> """
 debugging = True
+draw_mcts_graphs = False
 
 # This game object contains the initial game state.
 game = hlt.Game()
@@ -142,7 +143,7 @@ while True:
                     logging.info("Doing merged simulation for action " + action + "...")
                 ship_action_lists = {}
                 for shipId, mcts_runner in mcts_runners.items():
-                    ship_action_lists[mcts_runner.shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
+                    ship_action_lists[shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
 
                 # Profiling
                 start = timeit.default_timer()
@@ -160,13 +161,12 @@ while True:
                 for shipId, mcts_runner in mcts_runners.items():
                     child_node = mcts_runner.lastGeneratedChildren.pop(action, None)
                     if child_node is not None:
-                        child_node.totalReward = rewards[mcts_runner.shipId]
-                        mcts_runner.backpropagate(child_node, child_node.totalReward)
+                        mcts_runner.backpropagate(child_node, rewards[shipId])
 
             for shipId, mcts_runner in mcts_runners.items():
                 mcts_runner.update_ship_best_action_list()
 
-            if 0 in mcts_runners:
+            if draw_mcts_graphs and 0 in mcts_runners:
                 mcts_runners[0].generate_dot_graph("MCTS DOT code Ship 0 turn " + str(game.turn_number) + " iteration " + str(num_iterations_done+1) + ".gv")
 
         last_iteration_time = time.time() - iteration_start_time
