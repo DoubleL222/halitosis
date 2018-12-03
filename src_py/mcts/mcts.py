@@ -271,3 +271,17 @@ class Mcts:
     #         g.node(node_name, label=node_label)
     #         g.edge(parent_name, node_name)
     #         self.recursive_graph_node(g, child, node_name, child.action)
+
+    def generate_dot_graph(self, file_name):
+        with open(file_name, "w") as text_file:
+            print("digraph G {", file=text_file)
+            self.recursive_graph_node(text_file, self.rootNode, "root", "root")
+            print("}", file=text_file)
+
+    def recursive_graph_node(self, text_file, node, parent_name, parent_action):
+        for child in node.children:
+            node_name = parent_name + "_to_" + str(child.depth) + child.action
+            node_label = str(child.depth) + " - " + child.action + "\\n" + str(child.totalReward) + " / " + str(child.visits) + " =\\n" + "{:.2f}".format(child.totalReward / child.visits)
+            print("\"" + parent_name + "\" -> " + "\"" + node_name + "\";", file=text_file)
+            print("\"" + node_name + "\" [label=\"" + node_label + "\"];", file=text_file)
+            self.recursive_graph_node(text_file, child, node_name, child.action)
