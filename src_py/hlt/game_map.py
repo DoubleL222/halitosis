@@ -15,6 +15,7 @@ class MapCell:
         self.ship = None
         self.structure = None
         self.ship_queue = []
+        self.move_probabilities = {}
 
     @property
     def is_empty(self):
@@ -131,6 +132,12 @@ class GameMap:
 
     def clear_ship_queue(self, position):
         self[position].ship_queue = []
+
+    def add_to_cell_move_probability(self, position, move, to_add):
+        self[position].move_probabilities[move] += to_add
+
+    def set_cell_move_probability(self, position, move, value):
+        self[position].move_probabilities[move] = value
 
     def calculate_distance(self, source, target):
         """
