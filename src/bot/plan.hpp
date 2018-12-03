@@ -5,11 +5,10 @@
 struct Plan {
     SearchPath path;
     unsigned int execution_step;
+    hlt::Halite final_halite;
 
     Plan();
-    Plan(SearchPath path);
-    // Create a plan with all expectations set to -1.
-    Plan(Path path);
+    Plan(SearchPath path, hlt::Halite final_halite);
 
     bool is_finished() const;
 

@@ -2,22 +2,16 @@
 
 Plan::Plan()
   : path(SearchPath()),
-    execution_step(0)
+    execution_step(0),
+    final_halite(0)
 {
 }
 
-Plan::Plan(SearchPath path)
+Plan::Plan(SearchPath path, hlt::Halite final_halite)
   : path(path),
-    execution_step(0)
+    execution_step(0),
+    final_halite(final_halite)
 {
-}
-
-Plan::Plan(Path path)
-  : execution_step(0)
-{
-    for (auto dir : path) {
-        this->path.push_back(PathSegment(dir, -1));
-    }
 }
 
 bool Plan::is_finished() const {
@@ -40,7 +34,7 @@ void Plan::advance() {
 }
 
 hlt::Halite Plan::expected_total_halite() const {
-    return path[path.size()-1].halite;
+    return final_halite;
 }
 
 std::ostream& operator<<(std::ostream& os, const Plan& val) {

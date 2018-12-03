@@ -17,9 +17,10 @@ static const std::array<hlt::Direction, 5> ALL_DIRECTIONS = {
 struct PathSegment {
     hlt::Direction direction;
     hlt::Halite halite;
+    int mining_idx;
 
     PathSegment();
-    PathSegment(hlt::Direction direction, hlt::Halite halite);
+    PathSegment(hlt::Direction direction, hlt::Halite halite, int mining_idx);
 };
 
 using Path = std::vector<hlt::Direction>;
@@ -27,6 +28,7 @@ using SearchPath = std::vector<PathSegment>;
 
 struct OptimalPath {
     unsigned int search_depth;
+    hlt::Halite final_halite;
     SearchPath path;
 };
 
@@ -51,13 +53,10 @@ public:
 
     const hlt::Game& get_game() const;
 
-    hlt::Position move(hlt::Position pos, int direction_x, int direction_y);
-    hlt::Position move(hlt::Position pos, hlt::Direction direction);
+    hlt::Position move(hlt::Position pos, int direction_x, int direction_y) const;
+    hlt::Position move(hlt::Position pos, hlt::Direction direction) const;
 
     hlt::PlayerId get_closest_shipyard(hlt::Position pos);
-
-	//Direct path
-	Path get_direct_path(hlt::GameMap& map, hlt::Ship& ship, hlt::Position end);
 
     void ensure_moves_possible(std::unordered_map<hlt::EntityId, hlt::Direction>& moves);
 

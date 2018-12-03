@@ -9,13 +9,15 @@
 
 PathSegment::PathSegment()
   : direction(hlt::Direction::STILL),
-    halite(0)
+    halite(0),
+    mining_idx(0)
 {
 }
 
-PathSegment::PathSegment(hlt::Direction direction, hlt::Halite halite)
+PathSegment::PathSegment(hlt::Direction direction, hlt::Halite halite, int mining_idx)
   : direction(direction),
-    halite(halite)
+    halite(halite),
+    mining_idx(mining_idx)
 {
 }
 
@@ -47,13 +49,13 @@ const hlt::Game& Frame::get_game() const {
     return game;
 }
 
-hlt::Position Frame::move(hlt::Position pos, int dx, int dy) {
+hlt::Position Frame::move(hlt::Position pos, int dx, int dy) const {
     pos.x += dx;
     pos.y += dy;
     return game.game_map->normalize(pos);
 }
 
-hlt::Position Frame::move(hlt::Position pos, hlt::Direction direction) {
+hlt::Position Frame::move(hlt::Position pos, hlt::Direction direction) const {
     switch (direction) {
         case hlt::Direction::NORTH: return move(pos, 0, -1);
         case hlt::Direction::EAST: return move(pos, 1, 0);
@@ -83,11 +85,6 @@ hlt::PlayerId Frame::get_closest_shipyard(hlt::Position pos) {
 
 int Frame::get_index(hlt::Position position) const {
     return position.y*game.game_map->width+position.x;
-}
-
-Path Frame::get_direct_path(hlt::GameMap & map, hlt::Ship & ship, hlt::Position end) {
-	Path unsafe_path = map.get_unsafe_moves(ship.position, end);
-	return unsafe_path;
 }
 
 unsigned int Frame::get_board_size() const {

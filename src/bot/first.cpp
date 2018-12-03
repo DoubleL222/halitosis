@@ -31,6 +31,70 @@ void FirstBot::init(hlt::Game& game) {
     game.ready(args.name);
 }
 
+// Create a new map, where destroyed ships have been removed.
+template <typename T>
+std::unordered_map<hlt::EntityId, T> remove_destroyed_ships(
+    const std::unordered_map<hlt::EntityId, T>& map,
+    const std::vector<std::shared_ptr<hlt::Ship>>& current_ships
+) {
+    std::unordered_map<hlt::EntityId, T> res;
+    for (auto ship : current_ships) {
+        res[ship->id] = map[ship->id];
+    }
+    return res;
+}
+
+void optimize_minings(
+    const Frame& frame,
+    const std::vector<std::shared_ptr<hlt::Ship>>& ships,
+    std::unordered_map<hlt::EntityId, Plan>& plans
+) {
+    const int MINING_DEPTH = 25;
+
+    // Initialization
+    std::vector<bool> used(frame.get_board_size()*MINING_DEPTH);
+    std::vector<int> corrected_indices(frame.get_board_size()*MINING_DEPTH);
+
+    // Set which minings are used
+    for (auto ship : ships) {
+        auto& plan = plans[ship->id];
+        auto pos = ship->position;
+        for (size_t i=plan.execution_step; i < plan.path.size(); i++) {
+            pos = frame.move(pos, plan.path[i].direction);
+            if (plan.path[i].direction == hlt::Direction::STILL) {
+                auto mining_idx = plan.path[i].mining_idx;
+                if (mining_idx < MINING_DEPTH) {
+                    used[frame.get_index(pos)*MINING_DEPTH+mining_idx] = true;
+                }
+            }
+        }
+    }
+
+    // Set corrected indices
+    for (unsigned int pos=0; pos < frame.get_board_size(); pos++) {
+        int corrected = 0;
+        for (int idx=0; idx < MINING_DEPTH; idx++) {
+            corrected_indices[pos*MINING_DEPTH+idx] = corrected;
+            corrected += used[pos*MINING_DEPTH+idx];
+        }
+    }
+
+    for (auto ship : ships) {
+        auto& plan = plans[ship->id];
+        auto pos = ship->position;
+        for (size_t i=plan.execution_step; i < plan.path.size(); i++) {
+            pos = frame.move(pos, plan.path[i].direction);
+            if (plan.path[i].direction == hlt::Direction::STILL) {
+                auto mining_idx = plan.path[i].mining_idx;
+                if (mining_idx < MINING_DEPTH) {
+                    auto board_idx = frame.get_index(pos);
+                    plan.path[i].mining_idx = corrected_indices[board_idx*MINING_DEPTH+mining_idx];
+                }
+            }
+        }
+    }
+}
+
 std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_time) {
     Frame frame(game);
     auto player = game.me;
@@ -49,7 +113,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         }
         std::cerr << "Player " << player->id << ": " <<
             "collected=" << player->halite <<
-            "on ships=" << halite_on_ships << std::endl;
+            " on ships=" << halite_on_ships << std::endl;
         throw ("die");
     }
 
@@ -65,6 +129,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
 
 	//Make game clone
 	GameClone game_clone(frame);
+    optimize_minings(frame, ships, plans);
 	for (auto ship : ships) {
 		game_clone.advance_game(plans[ship->id], *ship);
 	}
@@ -107,7 +172,6 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
             return recalculation_priority[a->id] > recalculation_priority[b->id];
         });
 
-    std::cerr << "turn: " << frame.get_game().turn_number << std::endl;
     // Calculate as many new plans as possible within time constraints
     int turns_left = hlt::constants::MAX_TURNS-frame.get_game().turn_number;
     for (size_t ship_idx = 0; ship_idx < ships.size() && ms_clock::now() < end_time; ship_idx++) {
@@ -132,8 +196,8 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         // Also ensure that a path was actually found
         if (search_path.search_depth > 80 && search_path.path.size() > 0) {
             bool fresh_plan = plans[ship.id].is_finished();
-            plans[ship.id] = Plan(search_path.path);
-            std::cerr << "created plan for " << ship.id << ": " << plans[ship.id] << std::endl;
+            Plan new_plan(search_path.path, search_path.final_halite);
+            plans[ship.id] = new_plan;
             // Only calculate worth if its an original path
             if (fresh_plan) {
                 auto worth = search_path.path[search_path.path.size()-1].halite;

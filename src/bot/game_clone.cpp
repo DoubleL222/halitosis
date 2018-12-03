@@ -4,10 +4,11 @@
 
 GameClone::GameClone(Frame& frame)
   : frame(frame),
-    num_minings(frame.get_board_size()),
+    minings(frame.get_board_size()),
     turns_until_occupation(frame.get_board_size()),
     structures(frame.get_board_size())
 {
+    minings.assign(frame.get_board_size(), (1 << 25)-1);
     turns_until_occupation.assign(frame.get_board_size(), -1);
     structures.assign(frame.get_board_size(), -1);
     for (auto player : frame.get_game().players) {
@@ -26,46 +27,34 @@ void GameClone::advance_game(Plan& plan, hlt::Ship& ship) {
         auto move = plan.path[i].direction;
         if (move == hlt::Direction::STILL) {
             auto idx = frame.get_index(current_pos);
-            num_minings[idx]++;
+            minings[idx] ^= (1 << plan.path[i].mining_idx);
         }
         current_pos = frame.move(current_pos, move);
     }
 }
 
 void GameClone::undo_advancement(Plan& plan, hlt::Ship& ship) {
-    auto current_pos = ship.position;
-    for (size_t i = plan.execution_step; i < plan.path.size(); i++) {
-        auto move = plan.path[i].direction;
-        if (move == hlt::Direction::STILL) {
-            auto idx = frame.get_index(current_pos);
-            num_minings[idx]--;
-        }
-        current_pos = frame.move(current_pos, move);
-    }
+    // advance_game is currently a toggle.
+    advance_game(plan, ship);
+}
+
+int ceil_div(int a, int b) {
+    return (a+b-1)/b;
 }
 
 hlt::Halite GameClone::get_expectation(Plan& plan, hlt::Ship& ship) const {
-    auto current_pos = ship.position;
-    auto current_halite = ship.halite;
-    std::unordered_map<hlt::Position, hlt::Halite> halite_override;
-
+    hlt::Halite res = ship.halite;
+    hlt::Position pos = ship.position;
     for (size_t i=plan.execution_step; i < plan.path.size(); i++) {
-        auto move = plan.path[i].direction;
-
-        auto sea_halite = halite_override.count(current_pos)
-            ? halite_override.at(current_pos)
-            : get_halite(current_pos);
-        if (move == hlt::Direction::STILL) {
-            auto new_halite = current_halite + sea_halite/hlt::constants::EXTRACT_RATIO;
-            new_halite = std::min(current_halite, hlt::constants::MAX_HALITE);
-            halite_override[current_pos] = sea_halite-(new_halite-current_halite);
-            current_halite = new_halite;
+        auto halite = get_halite(pos, plan.path[i].mining_idx);
+        if (plan.path[i].direction == hlt::Direction::STILL) {
+            res += ceil_div(halite, hlt::constants::EXTRACT_RATIO);
         } else {
-            current_halite -= sea_halite/hlt::constants::MOVE_COST_RATIO;
-            current_pos = frame.move(current_pos, move);
+            res -= halite/hlt::constants::MOVE_COST_RATIO;
         }
+        pos = frame.move(pos, plan.path[i].direction);
     }
-    return current_halite;
+    return res;
 }
 
 void GameClone::set_occupied(hlt::Position pos, int turns) {
@@ -93,7 +82,6 @@ void GameClone::print_state(
 
 SearchPath GameClone::get_search_path(
     SearchState* search_state,
-    hlt::Position start,
     hlt::Position end,
     int max_depth
 ) const {
@@ -107,7 +95,8 @@ SearchPath GameClone::get_search_path(
 
         res[depth-1] = PathSegment(
             search_state[idx].in_direction,
-            search_state[prev_idx].halite
+            search_state[prev_idx].halite,
+            search_state[idx].mining_idx
         );
         current_pos = prev_pos;
     }
@@ -117,6 +106,16 @@ SearchPath GameClone::get_search_path(
 bool should_update_search(SearchState& cur, hlt::Halite halite, SearchState& best) {
     if (!best.visited) { return true; }
     return halite > best.halite;
+}
+
+int get_least_significant_one_idx(int bits) {
+    int res = 0;
+    int probe = 1;
+    while ((probe & bits) == 0) {
+        res++;
+        probe <<= 1;
+    }
+    return res;
 }
 
 // Find an optimal path to a point for a ship on a specific map.
@@ -137,7 +136,7 @@ OptimalPath GameClone::get_optimal_path(
     int start_idx = frame.get_depth_index(0, start);
     search_state[start_idx].halite = ship.halite;
     search_state[start_idx].visited = true;
-    search_state[start_idx].board_override = std::unordered_map<hlt::Position, hlt::Halite>();
+    search_state[start_idx].minings_override = std::unordered_map<hlt::Position, int>();
     int search_depth = 0;
     for (
         auto now = ms_clock::now();
@@ -155,20 +154,20 @@ OptimalPath GameClone::get_optimal_path(
 
                 auto current_halite = search_state[cur_idx].halite;
 
-                int sea_halite = 0;
-                if (!is_occupied(pos, search_depth) && !has_structure(pos)) {
-                    if (search_state[cur_idx].board_override.count(pos)) {
-                        sea_halite = search_state[cur_idx].board_override[pos];
-                    } else {
-                        sea_halite = get_halite(pos);
-                    }
+                int available_minings = minings[frame.get_index(pos)];
+                if (search_state[cur_idx].minings_override.count(pos)) {
+                    available_minings = search_state[cur_idx].minings_override[pos];
                 }
-                auto halite_after_move = current_halite-std::ceil(sea_halite*0.1);
-                auto halite_after_gather = current_halite;
-                if (!has_structure(pos)) {
-                    halite_after_gather += (hlt::Halite)std::ceil(sea_halite*0.25);
-                    halite_after_gather = std::min(halite_after_gather, hlt::constants::MAX_HALITE);
-                }
+
+                bool mining_possible = available_minings != 0 && !has_structure(pos);
+                auto next_mining_idx =
+                    mining_possible ? get_least_significant_one_idx(available_minings) : 0;
+                auto sea_halite = mining_possible ? get_halite(pos, next_mining_idx) : 0;
+
+                auto halite_after_move = current_halite-sea_halite/hlt::constants::MOVE_COST_RATIO;
+                auto halite_after_gather =
+                    current_halite+ceil_div(sea_halite, hlt::constants::EXTRACT_RATIO);
+                halite_after_gather = std::min(hlt::constants::MAX_HALITE, halite_after_gather);
 
                 // Movement
                 if (halite_after_move >= 0) {
@@ -185,8 +184,11 @@ OptimalPath GameClone::get_optimal_path(
                                     halite_after_move,
                                     search_state[new_idx]);
                                 if (update) {
-                                    search_state[new_idx].board_override
-                                        = search_state[cur_idx].board_override;
+                                    search_state[new_idx].minings_override
+                                        = search_state[cur_idx].minings_override;
+                                    // Matters, as get_expectation uses it to compute the cost of moving
+                                    search_state[new_idx].mining_idx =
+                                        mining_possible ? next_mining_idx : 30;
                                     search_state[new_idx].in_direction = direction;
                                     search_state[new_idx].visited = true;
                                     search_state[new_idx].halite = halite_after_move;
@@ -197,19 +199,19 @@ OptimalPath GameClone::get_optimal_path(
                 }
                 // Gathering
                 int new_idx = frame.get_depth_index(search_depth+1, pos);
-                bool update = search_depth != 0 && should_update_search(
+                bool update = mining_possible && should_update_search(
                     search_state[cur_idx],
                     halite_after_gather,
                     search_state[new_idx]);
                 if (update) {
-                    std::unordered_map<hlt::Position, hlt::Halite> new_override(
-                        search_state[cur_idx].board_override
+                    std::unordered_map<hlt::Position, int> new_override(
+                        search_state[cur_idx].minings_override
                     );
-                    new_override[pos] =
-                        sea_halite-(halite_after_gather-current_halite);
+                    new_override[pos] = (available_minings ^ (1 << next_mining_idx));
 
                     search_state[new_idx].halite = halite_after_gather;
-                    search_state[new_idx].board_override = new_override;
+                    search_state[new_idx].minings_override = new_override;
+                    search_state[new_idx].mining_idx = next_mining_idx;
                     search_state[new_idx].in_direction = hlt::Direction::STILL;
                     search_state[new_idx].visited = true;
                 }
@@ -219,22 +221,25 @@ OptimalPath GameClone::get_optimal_path(
 
     int best_per_turn_depth = 0;
     float best_halite_per_turn = 0;
+    hlt::Halite best_halite = 0;
     for (int depth=1; depth < search_depth; depth++) {
         int idx = frame.get_depth_index(depth, end);
         float halite_per_turn = ((float)(search_state[idx].halite))/(depth+current_turns_underway);
         if (halite_per_turn > best_halite_per_turn) {
             best_halite_per_turn = halite_per_turn;
             best_per_turn_depth = depth;
+            best_halite = search_state[idx].halite;
         }
     }
 
     OptimalPath res;
     res.search_depth = search_depth;
+    res.final_halite = best_halite;
     if (best_per_turn_depth == 0) {
         // No path found
         res.path = {};
     } else {
-        res.path = get_search_path(search_state, start, end, best_per_turn_depth);
+        res.path = get_search_path(search_state, end, best_per_turn_depth);
     }
     return res;
 }
@@ -247,10 +252,9 @@ int GameClone::height() const {
     return frame.get_game().game_map->height;
 }
 
-hlt::Halite GameClone::get_halite(hlt::Position pos) const {
+hlt::Halite GameClone::get_halite(hlt::Position pos, int mining_idx) const {
     auto res = frame.get_game().game_map->at(pos)->halite;
-    auto idx = frame.get_index(pos);
-    for (unsigned int i=0; i < num_minings[idx]; i++) {
+    for (int i=0; i < mining_idx; i++) {
         res -= res/hlt::constants::EXTRACT_RATIO;
     }
     return res;
@@ -288,7 +292,7 @@ hlt::Position GameClone::find_close_halite(hlt::Position start) {
             float halite = 0;
             // Set to high value, as opponents ships should not compete amongst themselves
             if (is_occupied(pos, 200)) {
-                halite = get_halite(pos);
+                halite = get_halite(pos, 0);
             }
             auto per_turn = halite/dist;
             if (per_turn > best_per_turn) {

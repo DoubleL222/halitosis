@@ -13,14 +13,15 @@
 struct SearchState {
     bool visited;
     hlt::Halite halite;
-    std::unordered_map<hlt::Position, hlt::Halite> board_override;
+    int mining_idx;
+    std::unordered_map<hlt::Position, int> minings_override;
     hlt::Direction in_direction;
 };
 
 class GameClone {
 	Frame& frame;
-    // Number of times that a cell has been mined.
-    std::vector<unsigned int> num_minings;
+    // Bitset of available minings
+    std::vector<unsigned int> minings;
     // Used to mark cells as unsafe once a certain number of turns has passed.
     std::vector<int> turns_until_occupation;
     std::vector<hlt::PlayerId> structures;
@@ -31,6 +32,9 @@ public:
     void advance_game(Plan& plan, hlt::Ship& ship);
     void undo_advancement(Plan& plan, hlt::Ship& ship);
     hlt::Halite get_expectation(Plan& plan, hlt::Ship& ship) const;
+
+    // Ensure that optimal minings are used.
+    void optimize_minings(std::unordered_map<hlt::EntityId, Plan>& plans) const;
 
     OptimalPath get_optimal_path(
         hlt::Ship& ship,
@@ -48,7 +52,7 @@ public:
 
     int width() const;
     int height() const;
-    hlt::Halite get_halite(hlt::Position pos) const;
+    hlt::Halite get_halite(hlt::Position pos, int mining_idx) const;
     bool has_structure(hlt::Position pos) const;
     bool has_own_structure(hlt::Position pos, hlt::PlayerId player) const;
     // Check whether the cell has been occupied after the given number of turns.
@@ -60,7 +64,6 @@ public:
 private:
     SearchPath get_search_path(
         SearchState* search_state,
-        hlt::Position start,
         hlt::Position end,
         int max_depth
     ) const;

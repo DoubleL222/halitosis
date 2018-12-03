@@ -14,6 +14,8 @@ void GravityBot::init(hlt::Game& game) {
 }
 
 std::vector<hlt::Command> GravityBot::run(const hlt::Game& game, time_point end_time) {
+    return {};
+    /*
     Frame frame(game);
     GravityGrid scent_grid(frame);
     auto player = frame.get_game().me;
@@ -80,4 +82,5 @@ std::vector<hlt::Command> GravityBot::run(const hlt::Game& game, time_point end_
         commands.push_back(player->shipyard->spawn());
     }
     return commands;
+    */
 }
