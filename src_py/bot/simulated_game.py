@@ -36,6 +36,8 @@ class GameSimulator:
             # Profiling
             start = timeit.default_timer()
 
+        to_search_depth += game_to_copy.turn_number
+
         if to_search_depth == -1:
             to_search_depth = hlt.constants.MAX_TURNS
         # Set search depth for simulation
@@ -241,19 +243,19 @@ class GameSimulator:
                                 self.game_copy.players[current_player.id].add_ship_halite(current_ship.id, -move_cost)
 
                             # Change position based on direction
-                            if split_command[2] == "n":
+                            if ship_command == "n":
                                 if self.do_debug:
                                     logging.info("Ship %d moving north", current_ship.id)
                                 current_ship.position = self.move(current_ship.position, 0, -1)
-                            elif split_command[2] == "s":
+                            elif ship_command == "s":
                                 if self.do_debug:
                                     logging.info("Ship %d moving south", current_ship.id)
                                 current_ship.position = self.move(current_ship.position, 0, 1)
-                            elif split_command[2] == "e":
+                            elif ship_command == "e":
                                 if self.do_debug:
                                     logging.info("Ship %d moving east", current_ship.id)
                                 current_ship.position = self.move(current_ship.position, 1, 0)
-                            elif split_command[2] == "w":
+                            elif ship_command == "w":
                                 if self.do_debug:
                                     logging.info("Ship %d moving west", current_ship.id)
                                 current_ship.position = self.move(current_ship.position, -1, 0)
