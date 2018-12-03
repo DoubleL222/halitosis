@@ -97,7 +97,8 @@ class GameSimulator:
                     logging.info("Player %d, has ship %d" % (curr_player_id, current_ship.id))
 
     def add_halite_score_to_ship(self, ship_id, halite):
-        logging.info("Added %d halite for ship scores id: %d" % (halite, ship_id))
+        if self.do_debug:
+            logging.info("Added %d halite for ship scores id: %d" % (halite, ship_id))
         if ship_id in self.ship_scores:
             self.ship_scores[ship_id] += halite
 

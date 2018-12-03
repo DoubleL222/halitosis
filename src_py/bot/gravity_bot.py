@@ -12,6 +12,6 @@ class GravityBot:
     def make_vector_map(self, game_map):
         for y in range(game_map.height):
             for x in range(game_map.width):
-
+                a = 1
 
 #    def run(self, game):
