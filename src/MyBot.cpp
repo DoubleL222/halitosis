@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     hlt::Game game;
 
     FirstBotArgs args;
-    args.max_turns = 100;
+//    args.max_turns = 100;
     args.avoid_enemy_collisions_enabled = (game.players.size() == 4);
 
     auto bot = FirstBot(args);
