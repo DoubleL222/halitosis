@@ -114,7 +114,7 @@ while True:
         use_best_action_list_for_other_ships = True
         max_iterations = 100000
         num_iterations_done = 0
-        start_time = time.time()
+        start_time = timeit.default_timer()
         time_limit = start_time + 1.0
         last_iteration_time = 0.0
 
@@ -136,7 +136,8 @@ while True:
                     logging.info("Maximum MCTS iterations reached!")
                 break
 
-            iteration_start_time = time.time()
+            iteration_start_time = timeit.default_timer()
+            simulation_time_spent = 0.0
 
             # Use last iteration's time spent, to approximate the amount of time we would spend on the next iteration,
             # and if we would exceed the allotted time_limit, break before doing anything.
@@ -152,22 +153,24 @@ while True:
                 for action in mcts.Mcts.ship_commands:
                     if debugging:
                         logging.info("Doing merged simulation for action " + action + "...")
+
                     ship_action_lists = {}
                     for shipId, mcts_runner in mcts_runners.items():
                         ship_action_lists[shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
 
-                    # Profiling
-                    start = timeit.default_timer()
+                    if debugging:
+                        start = timeit.default_timer()
 
                     rewards = mcts.Mcts.do_simulation(default_policy=default_policy, simulator=sim, ship_action_lists=ship_action_lists)
-
-                    # Profiling
-                    end = timeit.default_timer()
-                    logging.info("Simulation took: %.3f" % (end-start))
 
                     if debugging:
                         for ship_id, reward in rewards.items():
                             logging.info("Ship " + str(ship_id) + " reward: " + str(reward))
+
+                        # Profiling
+                        end = timeit.default_timer()
+                        logging.info("Simulation took: %.3f" % (end-start))
+                        simulation_time_spent += (end-start)
 
                     for shipId, mcts_runner in mcts_runners.items():
                         child_node = mcts_runner.lastGeneratedChildren.pop(action, None)
@@ -180,18 +183,19 @@ while True:
                 if draw_mcts_graphs and 0 in mcts_runners:
                     mcts_runners[0].generate_dot_graph("MCTS DOT code Ship 0 turn " + str(game.turn_number) + " iteration " + str(num_iterations_done+1) + ".gv")
 
-            last_iteration_time = time.time() - iteration_start_time
+            last_iteration_time = timeit.default_timer() - iteration_start_time
 
             if debugging:
-                logging.info("MCTS iteration time: " + str(last_iteration_time) + " Total time spent: " + str(time.time() - start_time) +
+                logging.info("Iteration timers -> MCTS time spent: " + str(last_iteration_time-simulation_time_spent) +
+                             " Simulation time spent: " + str(simulation_time_spent) +
+                             " Total time: " + str(last_iteration_time) +
+                             " Cumulative iteration time: " + str(timeit.default_timer() - start_time) +
                              "\n-------------------------------------------------------------------------------------")
 
             num_iterations_done += 1
 
         if debugging:
-            logging.info("MCTS ran for " + str(num_iterations_done) + " iterations. Took " + str(time.time() - start_time) + " seconds in total.")
-            # if game.turn_number == 10:
-            #     mcts_runners[0].generate_graph()
+            logging.info("MCTS ran for " + str(num_iterations_done) + " iterations. Took " + str(timeit.default_timer() - start_time) + " seconds in total.")
 
         action_list_dict = mcts.Mcts.ship_best_action_lists
         for ship in me.get_ships():
