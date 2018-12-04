@@ -40,6 +40,10 @@ game.ready("MyPythonBot")
 if debugging:
     logging.info("Successfully created bot! My Player ID is {}.".format(game.my_id))
 
+# Pre-calculate the exploration factors used in the MCTS calculations.
+# We can still set the exploration constant in the "constructor" for the MCTS instances.
+mcts.Mcts.precalculate_exploration_visit_factors(25000)
+
 """ <<<Game Loop>>> """
 
 while True:
@@ -55,161 +59,172 @@ while True:
     command_queue = []
 
     # --------------------------------------------------------
-    # Random Movement - START
+    # SHIP UPDATES - START
     # --------------------------------------------------------
 
-    # for ship in me.get_ships():
-    #     # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
-    #     #   Else, collect halite.
-    #     if game_map[ship.position].halite_amount < constants.MAX_HALITE / 10 or ship.is_full:
-    #         command_queue.append(
-    #             ship.move(
-    #                 random.choice([ Direction.North, Direction.South, Direction.East, Direction.West ])))
-    #     else:
-    #         command_queue.append(ship.stay_still())
+    # If there are no ships, do not do any simulations.
+    if me.get_ships():
+        # --------------------------------------------------------
+        # Random Movement - START
+        # --------------------------------------------------------
 
-    # --------------------------------------------------------
-    # Random Movement - END
-    # --------------------------------------------------------
+        # for ship in me.get_ships():
+        #     # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
+        #     #   Else, collect halite.
+        #     if game_map[ship.position].halite_amount < constants.MAX_HALITE / 10 or ship.is_full:
+        #         command_queue.append(
+        #             ship.move(
+        #                 random.choice([ Direction.North, Direction.South, Direction.East, Direction.West ])))
+        #     else:
+        #         command_queue.append(ship.stay_still())
 
-    #SIMULATION
+        # --------------------------------------------------------
+        # Random Movement - END
+        # --------------------------------------------------------
 
-    sim = simulated_game.GameSimulator(game, 50)
-    default_policy = random_bot.RandomBot(sim.game_copy, me.id)
+        # SIMULATION
 
-    # For running the game with no simulator, and just getting random rewards instead.
-    # sim = None
-    # default_policy = None
+        sim = simulated_game.GameSimulator(game, 50)
+        default_policy = random_bot.RandomBot(sim.game_copy, me.id)
 
-    # start = timeit.default_timer()
-    # sim.run_simulation(default_policy)
-    #
-    # end = timeit.default_timer()
-    # logging.info("------------ PERFORMANCE REPORT -------------")
-    # bot.profiling.print_ms_message((end - start), "Simulation took: ")
-    # bot.profiling.print_ms_message(sim.deep_copy_time_sum, "Deep copy took: ")
-    # bot.profiling.print_ms_message(sim.bot_time_sum, "Bot took: ")
-    # bot.profiling.print_ms_message(sim.advance_game_time_sum, "Advance game took: ")
+        # To run the game with no simulator, and just getting random rewards instead,
+        # comment in the following two lines, or comment out the previous two.
+        # sim = None
+        # default_policy = None
 
-    #END SIMULATION
+        # start = timeit.default_timer()
+        # sim.run_simulation(default_policy)
+        #
+        # end = timeit.default_timer()
+        # logging.info("------------ PERFORMANCE REPORT -------------")
+        # bot.profiling.print_ms_message((end - start), "Simulation took: ")
+        # bot.profiling.print_ms_message(sim.deep_copy_time_sum, "Deep copy took: ")
+        # bot.profiling.print_ms_message(sim.bot_time_sum, "Bot took: ")
+        # bot.profiling.print_ms_message(sim.advance_game_time_sum, "Advance game took: ")
 
-    # --------------------------------------------------------
-    # MCTS - START
-    # --------------------------------------------------------
+        # END SIMULATION
 
-    # Settings for MCTS runs.
-    # Timestamp = current time + time limit (all values are in seconds and are floats)
-    do_merged_simulations = True
-    use_best_action_list_for_other_ships = True
-    max_iterations = 100000
-    num_iterations_done = 0
-    start_time = time.time()
-    time_limit = start_time + 1.0
-    last_iteration_time = 0.0
+        # --------------------------------------------------------
+        # MCTS - START
+        # --------------------------------------------------------
 
-    # Reset best action lists
-    mcts.Mcts.ship_best_action_lists = {}
+        # Settings for MCTS runs.
+        # Timestamp = current time + time limit (all values are in seconds and are floats)
+        do_merged_simulations = True
+        use_best_action_list_for_other_ships = True
+        max_iterations = 100000
+        num_iterations_done = 0
+        start_time = time.time()
+        time_limit = start_time + 1.0
+        last_iteration_time = 0.0
 
-    # Create MCTS runners for each ship
-    mcts_runners = {}
-    for ship in me.get_ships():
-        mcts_runners[ship.id] = mcts.Mcts(ship=ship, game_state=game, current_turn=game.turn_number,
-                                          game_max_turns=constants.MAX_TURNS,
-                                          do_merged_simulations=do_merged_simulations,
-                                          use_best_action_list_for_other_ships=use_best_action_list_for_other_ships,
-                                          simulator=sim, default_policy=default_policy)
+        # Reset best action lists
+        mcts.Mcts.ship_best_action_lists = {}
 
-    while True:
-        if num_iterations_done >= max_iterations:
-            if debugging:
-                logging.info("Maximum MCTS iterations reached!")
-            break
+        # Create MCTS runners for each ship
+        mcts_runners = {}
+        for ship in me.get_ships():
+            mcts_runners[ship.id] = mcts.Mcts(ship=ship, game_state=game, current_turn=game.turn_number,
+                                              game_max_turns=constants.MAX_TURNS,
+                                              do_merged_simulations=do_merged_simulations,
+                                              use_best_action_list_for_other_ships=use_best_action_list_for_other_ships,
+                                              simulator=sim, default_policy=default_policy)
 
-        iteration_start_time = time.time()
-
-        # Use last iteration's time spent, to approximate the amount of time we would spend on the next iteration,
-        # and if we would exceed the allotted time_limit, break before doing anything.
-        if iteration_start_time + last_iteration_time >= time_limit:
-            if debugging:
-                logging.info("MCTS time ran out!")
-            break
-
-        for shipId, mcts_runner in mcts_runners.items():
-            mcts_runner.do_one_uct_update()
-
-        if do_merged_simulations:
-            for action in mcts.Mcts.ship_commands:
+        while True:
+            if num_iterations_done >= max_iterations:
                 if debugging:
-                    logging.info("Doing merged simulation for action " + action + "...")
-                ship_action_lists = {}
-                for shipId, mcts_runner in mcts_runners.items():
-                    ship_action_lists[shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
+                    logging.info("Maximum MCTS iterations reached!")
+                break
 
-                # Profiling
-                start = timeit.default_timer()
+            iteration_start_time = time.time()
 
-                rewards = mcts.Mcts.do_simulation(default_policy=default_policy, simulator=sim, ship_action_lists=ship_action_lists)
-
-                # Profiling
-                end = timeit.default_timer()
-                logging.info("Simulation took: %.3f" % (end-start))
-
+            # Use last iteration's time spent, to approximate the amount of time we would spend on the next iteration,
+            # and if we would exceed the allotted time_limit, break before doing anything.
+            if iteration_start_time + last_iteration_time >= time_limit:
                 if debugging:
-                    for ship_id, reward in rewards.items():
-                        logging.info("Ship " + str(ship_id) + " reward: " + str(reward))
-
-                for shipId, mcts_runner in mcts_runners.items():
-                    child_node = mcts_runner.lastGeneratedChildren.pop(action, None)
-                    if child_node is not None:
-                        mcts_runner.backpropagate(child_node, rewards[shipId])
+                    logging.info("MCTS time ran out!")
+                break
 
             for shipId, mcts_runner in mcts_runners.items():
-                mcts_runner.update_ship_best_action_list()
+                mcts_runner.do_one_uct_update()
 
-            if draw_mcts_graphs and 0 in mcts_runners:
-                mcts_runners[0].generate_dot_graph("MCTS DOT code Ship 0 turn " + str(game.turn_number) + " iteration " + str(num_iterations_done+1) + ".gv")
+            if do_merged_simulations:
+                for action in mcts.Mcts.ship_commands:
+                    if debugging:
+                        logging.info("Doing merged simulation for action " + action + "...")
+                    ship_action_lists = {}
+                    for shipId, mcts_runner in mcts_runners.items():
+                        ship_action_lists[shipId] = mcts_runner.get_specific_action_list(action, mcts_runner.lastExpandedNode)
 
-        last_iteration_time = time.time() - iteration_start_time
+                    # Profiling
+                    start = timeit.default_timer()
 
-        if debugging:
-            logging.info("MCTS iteration time: " + str(last_iteration_time) + " Total time spent: " + str(time.time() - start_time) +
-                         "\n-------------------------------------------------------------------------------------")
+                    rewards = mcts.Mcts.do_simulation(default_policy=default_policy, simulator=sim, ship_action_lists=ship_action_lists)
 
-        num_iterations_done += 1
+                    # Profiling
+                    end = timeit.default_timer()
+                    logging.info("Simulation took: %.3f" % (end-start))
 
-    if debugging:
-        logging.info("MCTS ran for " + str(num_iterations_done) + " iterations. Took " + str(time.time() - start_time) + " seconds in total.")
-        # if game.turn_number == 10:
-        #     mcts_runners[0].generate_graph()
+                    if debugging:
+                        for ship_id, reward in rewards.items():
+                            logging.info("Ship " + str(ship_id) + " reward: " + str(reward))
 
-    action_list_dict = mcts.Mcts.ship_best_action_lists
-    for ship in me.get_ships():
-        if debugging:
-            logging.info("Ship " + str(ship.id))
-        # Debugging stuff.
-        action_list = action_list_dict[ship.id]
-        actions = ""
-        for action in action_list:
-            actions += action + ", "
-        if debugging:
-            logging.info("Ship " + str(ship.id) + " best action list after update: " + actions)
+                    for shipId, mcts_runner in mcts_runners.items():
+                        child_node = mcts_runner.lastGeneratedChildren.pop(action, None)
+                        if child_node is not None:
+                            mcts_runner.backpropagate(child_node, rewards[shipId])
 
-        # Select an action using the newly updated best ship action lists.
-        action = None
-        if ship.id in mcts_runners:
-            action = ship.move(mcts_runners[ship.id].get_best_action())
+                for shipId, mcts_runner in mcts_runners.items():
+                    mcts_runner.update_ship_best_action_list()
+
+                if draw_mcts_graphs and 0 in mcts_runners:
+                    mcts_runners[0].generate_dot_graph("MCTS DOT code Ship 0 turn " + str(game.turn_number) + " iteration " + str(num_iterations_done+1) + ".gv")
+
+            last_iteration_time = time.time() - iteration_start_time
+
             if debugging:
-                logging.info("Ship " + str(ship.id) + " is doing MCTS action: " + action)
-        else:
-            action = ship.move(random.choice([Direction.North, Direction.South, Direction.East, Direction.West]))
-            if debugging:
-                logging.info("Ship " + str(ship.id) + " is doing random action: " + action)
+                logging.info("MCTS iteration time: " + str(last_iteration_time) + " Total time spent: " + str(time.time() - start_time) +
+                             "\n-------------------------------------------------------------------------------------")
 
-        # Append the chosen action to the command queue.
-        command_queue.append(action)
+            num_iterations_done += 1
+
+        if debugging:
+            logging.info("MCTS ran for " + str(num_iterations_done) + " iterations. Took " + str(time.time() - start_time) + " seconds in total.")
+            # if game.turn_number == 10:
+            #     mcts_runners[0].generate_graph()
+
+        action_list_dict = mcts.Mcts.ship_best_action_lists
+        for ship in me.get_ships():
+            if debugging:
+                logging.info("Ship " + str(ship.id))
+            # Debugging stuff.
+            action_list = action_list_dict[ship.id]
+            actions = ""
+            for action in action_list:
+                actions += action + ", "
+            if debugging:
+                logging.info("Ship " + str(ship.id) + " best action list after update: " + actions)
+
+            # Select an action using the newly updated best ship action lists.
+            action = None
+            if ship.id in mcts_runners:
+                action = ship.move(mcts_runners[ship.id].get_best_action())
+                if debugging:
+                    logging.info("Ship " + str(ship.id) + " is doing MCTS action: " + action)
+            else:
+                action = ship.move(random.choice([Direction.North, Direction.South, Direction.East, Direction.West]))
+                if debugging:
+                    logging.info("Ship " + str(ship.id) + " is doing random action: " + action)
+
+            # Append the chosen action to the command queue.
+            command_queue.append(action)
+
+        # --------------------------------------------------------
+        # MCTS - END
+        # --------------------------------------------------------
 
     # --------------------------------------------------------
-    # MCTS - END
+    # SHIP UPDATES - END
     # --------------------------------------------------------
 
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.

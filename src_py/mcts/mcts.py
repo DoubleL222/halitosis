@@ -8,7 +8,7 @@ import math
 import copy
 import random
 import logging
-#from graphviz import Digraph
+import timeit
 
 
 class TreeNode:
@@ -33,8 +33,8 @@ class TreeNode:
 class Mcts:
     ship_commands = {'n', 's', 'e', 'w', 'o'}
     ship_best_action_lists = {}
-
     debug = True
+    cached_exploration_factors = []
 
     # exploration_constant note: Larger values will increase exploitation, smaller will increase exploration.
     def __init__(self, exploration_constant=1 / math.sqrt(2), game_state=None, ship=None,
@@ -61,6 +61,19 @@ class Mcts:
     #         ∆ ← DEFAULTPOLICY(s(vl))
     #         BACKUP(vl, ∆)
     #     return a(BESTCHILD(v0, 0))
+
+    @staticmethod
+    def precalculate_exploration_visit_factors(max_expected_visits):
+        if not Mcts.cached_exploration_factors:
+            if Mcts.debug:
+                start = timeit.default_timer()
+            Mcts.cached_exploration_factors = [0.0]
+            for i in range(1, max_expected_visits):
+                Mcts.cached_exploration_factors.append(math.sqrt(2.0 * math.log(i) / i))
+            if Mcts.debug:
+                end = timeit.default_timer()
+                logging.info("Precomputing " + str(max_expected_visits) + " exploration visit factors took: "
+                             + str((end-start)) + " seconds.")
 
     def do_one_uct_update(self):
         self.tree_policy()
@@ -208,7 +221,7 @@ class Mcts:
         best_children = []
         for child in node.children:
             exploit = child.totalReward / child.visits
-            explore = math.sqrt(2.0 * math.log(node.visits) / float(child.visits))
+            explore = Mcts.cached_exploration_factors[child.visits]
             score = exploit + self.explorationConstant * explore
             if score > best_score:
                 best_children = [child]
