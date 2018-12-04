@@ -67,9 +67,11 @@ class Mcts:
         if not Mcts.cached_exploration_factors:
             if Mcts.debug:
                 start = timeit.default_timer()
+
             Mcts.cached_exploration_factors = [0.0]
             for i in range(1, max_expected_visits):
                 Mcts.cached_exploration_factors.append(math.sqrt(2.0 * math.log(i) / i))
+
             if Mcts.debug:
                 end = timeit.default_timer()
                 logging.info("Precomputing " + str(max_expected_visits) + " exploration visit factors took: "
@@ -126,7 +128,7 @@ class Mcts:
                 new_node.totalReward = rewards.pop(self.shipId, 0)
                 if self.debug:
                     logging.info("Ship " + str(self.shipId) + " -> New node reward: " + str(new_node.totalReward))
-                self.backpropagate(new_node, new_node.totalReward)
+                self.backup(new_node, new_node.totalReward)
             else:
                 self.lastGeneratedChildren[action] = new_node
             node.children.append(new_node)
@@ -221,6 +223,7 @@ class Mcts:
         best_children = []
         for child in node.children:
             exploit = child.totalReward / child.visits
+            # explore = math.sqrt(2.0 * math.log(child.visits) / child.visits)
             explore = Mcts.cached_exploration_factors[child.visits]
             score = exploit + self.explorationConstant * explore
             if score > best_score:
@@ -264,7 +267,7 @@ class Mcts:
     #         Q(v) ← Q(v) + ∆(v, p)
     #         v ← parent of v
 
-    def backpropagate(self, node, reward):
+    def backup(self, node, reward):
         while node is not None:
             node.visits += 1
             node.totalReward += reward

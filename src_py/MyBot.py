@@ -172,7 +172,7 @@ while True:
                     for shipId, mcts_runner in mcts_runners.items():
                         child_node = mcts_runner.lastGeneratedChildren.pop(action, None)
                         if child_node is not None:
-                            mcts_runner.backpropagate(child_node, rewards[shipId])
+                            mcts_runner.backup(child_node, rewards[shipId])
 
                 for shipId, mcts_runner in mcts_runners.items():
                     mcts_runner.update_ship_best_action_list()
