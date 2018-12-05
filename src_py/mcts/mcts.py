@@ -102,12 +102,6 @@ class Mcts:
             else:
                 node = self.best_child(node)
 
-    def get_current_best_action_node(self):
-        node = self.rootNode
-        while not node.isTerminal and node.isFullyExpanded:
-            node = self.best_child_by_reward_only(node)
-        return node
-
     # function EXPAND(v)
     #     choose a ∈ untried actions from A(s(v))
     #     add a new child v' to v
@@ -163,8 +157,12 @@ class Mcts:
         return new_ship_action_tree
 
     def update_ship_best_action_list(self):
-        best_node = self.get_current_best_action_node()
-        new_ship_action_tree = self.get_specific_action_list(best_node.action, best_node.parent)
+        node = self.rootNode
+        new_ship_action_tree = []
+        while not node.isTerminal and node.isFullyExpanded:
+            node = self.best_child_by_reward_only(node)
+            new_ship_action_tree.append(self.ship.move(node.action))
+
         self.ship_best_action_lists[self.shipId] = new_ship_action_tree
         return
 
@@ -219,6 +217,7 @@ class Mcts:
         if self.debug and node.children is None:
             logging.info("Ship " + str(self.shipId) + " -> node.children is None! depth: "
                          + node.depth + ", action: " + node.action)
+
         best_score = -1.0
         best_children = []
         for child in node.children:
@@ -226,14 +225,14 @@ class Mcts:
             # explore = math.sqrt(2.0 * math.log(child.visits) / child.visits)
             explore = Mcts.cached_exploration_factors[child.visits]
             score = exploit + self.explorationConstant * explore
-            if score > best_score:
-                best_children = [child]
-                best_score = score
             if math.isclose(score, best_score):
                 best_children.append(child)
-        if len(best_children) == 0:
-            if self.debug:
-                logging.info("Ship " + str(self.shipId) + " -> Could not find best child!")
+            elif score > best_score:
+                best_children = [child]
+                best_score = score
+
+        if self.debug and len(best_children) == 0:
+            logging.info("Ship " + str(self.shipId) + " -> Could not find best child!")
         return random.choice(best_children)
 
     # Used only to find the current best action, to make an action list from.
@@ -242,11 +241,11 @@ class Mcts:
         best_children = []
         for child in node.children:
             score = child.totalReward / child.visits
-            if score > best_score:
-                best_children = [child]
-                best_score = score
             if math.isclose(score, best_score):
                 best_children.append(child)
+            elif score > best_score:
+                best_children = [child]
+                best_score = score
         return random.choice(best_children)
 
     def get_best_action(self):
