@@ -1,0 +1,1 @@
+forfiles /m "*.gv" /c "cmd /c dot -Tpng @file > @fname.png"
