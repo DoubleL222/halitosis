@@ -25,7 +25,7 @@ from bot import random_bot
 from bot import simulated_game
 import timeit
 """ <<<Game Begin>>> """
-debugging = True
+debugging = False
 draw_mcts_graphs = False
 
 # This game object contains the initial game state.
@@ -149,7 +149,10 @@ while True:
             for shipId, mcts_runner in mcts_runners.items():
                 mcts_runner.do_one_uct_update()
 
-            if do_merged_simulations:
+            if not do_merged_simulations:
+                if draw_mcts_graphs and 0 in mcts_runners:
+                    mcts_runners[0].generate_dot_graph("MCTS DOT code Ship 0 turn " + str(game.turn_number) + " iteration " + str(num_iterations_done+1) + ".gv")
+            else:
                 for action in mcts.Mcts.ship_commands:
                     if debugging:
                         logging.info("Doing merged simulation for action " + action + "...")

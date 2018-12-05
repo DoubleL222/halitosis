@@ -33,7 +33,7 @@ class TreeNode:
 class Mcts:
     ship_commands = {'n', 's', 'e', 'w', 'o'}
     ship_best_action_lists = {}
-    debug = True
+    debug = False
     cached_exploration_factors = []
 
     # exploration_constant note: Larger values will increase exploitation, smaller will increase exploration.
@@ -119,10 +119,11 @@ class Mcts:
             if not self.doMergedSimulations:
                 rewards = self.do_simulation(simulator=self.simulator, default_policy=self.defaultPolicy,
                                              ship_action_lists=self.compile_new_action_lists_for_individual_run(new_node))
+
+                self.backup(new_node, rewards.pop(self.shipId, 0))
+
                 if self.debug:
                     logging.info("Ship " + str(self.shipId) + " -> New node reward: " + str(new_node.totalReward))
-                    
-                self.backup(new_node, rewards.pop(self.shipId, 0))
             else:
                 self.lastGeneratedChildren[action] = new_node
             node.children.append(new_node)
