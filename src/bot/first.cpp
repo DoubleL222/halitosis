@@ -16,7 +16,8 @@ FirstBotArgs::FirstBotArgs()
         ship_build_factor(0.5),
         simulate_enemy_enabled(true),
         recalculate_paths_enabled(true),
-        avoid_enemy_collisions_enabled(true)
+        avoid_enemy_collisions_enabled(true),
+        penalty_factor(SearchPenaltyFactor::Zero)
     {
     }
 
@@ -187,6 +188,7 @@ std::vector<hlt::Command> FirstBot::run(const hlt::Game& game, time_point end_ti
         auto search_path = game_clone.get_optimal_path(
             ship,
             current_turns_underway[ship.id],
+            args.penalty_factor,
             player->shipyard->position,
             end_time,
             max_depth,

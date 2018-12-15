@@ -2,6 +2,7 @@
 
 #include "bot/bot.hpp"
 #include "bot/plan.hpp"
+#include "bot/game_clone.hpp"
 #include "frame.hpp"
 #include "hlt/command.hpp"
 #include "hlt/game.hpp"
@@ -26,6 +27,8 @@ struct FirstBotArgs {
     bool recalculate_paths_enabled;
     // Whether to try to avoid collisions with the enemy.
     bool avoid_enemy_collisions_enabled;
+    // Which type of penalty to use when searching
+    SearchPenaltyFactor penalty_factor;
 
     FirstBotArgs();
 };

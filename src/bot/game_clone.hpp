@@ -1,18 +1,25 @@
 #pragma once
 
 #include "bot/bot.hpp"
+#include "bot/plan.hpp"
 #include "frame.hpp"
 #include "hlt/command.hpp"
 #include "hlt/game.hpp"
-#include "first.hpp"
 
 #include <string.h>
 #include <random>
 #include <vector>
 
+enum SearchPenaltyFactor {
+    Zero,
+    Decaying,
+    One
+};
+
 struct SearchState {
     bool visited;
     hlt::Halite halite;
+    float penalty;
     int mining_idx;
     std::unordered_map<hlt::Position, int> minings_override;
     hlt::Direction in_direction;
@@ -41,6 +48,7 @@ public:
         // The number of turns a ship has been underway already.
         // Needed to avoid ships heading home too early
         size_t current_turns_underway,
+        SearchPenaltyFactor penalty_factor,
         hlt::Position end,
         time_point end_time,
         int max_depth,

@@ -1,4 +1,5 @@
 #include "bot/first.hpp"
+#include "bot/mcts.hpp"
 #include "hlt/game.hpp"
 #include "hlt/log.hpp"
 
@@ -14,11 +15,15 @@ int main(int argc, char* argv[]) {
 
     hlt::Game game;
 
+    /*
     FirstBotArgs args;
 //    args.max_turns = 100;
     args.avoid_enemy_collisions_enabled = (game.players.size() == 4);
-
+    args.penalty_factor = SearchPenaltyFactor::Decaying;
     auto bot = FirstBot(args);
+    */
+
+    MctsBot bot(rng_seed);
     bot.init(game);
 
     while (true) {

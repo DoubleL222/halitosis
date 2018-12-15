@@ -6,12 +6,20 @@
 #include "hlt/map_cell.hpp"
 #include "bot/typedefs.hpp"
 
+// Must match all_directions
+enum Move {
+    STILL_INDEX,
+    NORTH_INDEX,
+    SOUTH_INDEX,
+    EAST_INDEX,
+    WEST_INDEX
+};
 static const std::array<hlt::Direction, 5> ALL_DIRECTIONS = {
+    hlt::Direction::STILL,
     hlt::Direction::NORTH,
     hlt::Direction::SOUTH,
     hlt::Direction::EAST,
-    hlt::Direction::WEST,
-    hlt::Direction::STILL
+    hlt::Direction::WEST
 };
 
 struct PathSegment {
