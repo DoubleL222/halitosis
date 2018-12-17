@@ -5,6 +5,8 @@
 #include <cmath>
 #include <random>
 
+//#define DEBUG
+
 // Larger values will increase exploration, smaller will increase exploitation.
 const float EXPLORATION_CONSTANT = std::sqrt(2.0);
 
@@ -405,6 +407,13 @@ struct MctsSimulation {
         // For each player, how many own ships within range to subtract.
         std::vector<std::vector<int>> num_own_inspiring_ships;
 
+#ifdef DEBUG
+        // All taken moves, for debug purposes
+        std::vector<std::vector<int>> all_taken_moves(ships.size());
+        std::vector<std::vector<int>> all_current_halite(ships.size());
+        std::vector<std::vector<float>> all_current_res(ships.size());
+#endif
+
         for (size_t i=0; i < frame.get_game().players.size(); i++) {
             num_own_inspiring_ships.push_back(std::vector<int>(frame.get_board_size()));
         }
@@ -465,9 +474,17 @@ struct MctsSimulation {
                     num_ships_in_cell[ship.position]++;
                 }
                 ship.turns_underway++;
-                if (get_distance_to_dropoff(ship.position, ship.player) == 0) {
+                if (get_distance_to_dropoff(ship.position, ship.player) == 0
+                    && ship.halite_per_turn < 0
+                ) {
                     ship.halite_per_turn = ((float)ship.halite)/ship.turns_underway;
                 }
+
+#ifdef DEBUG
+                all_taken_moves[ship_idx].push_back(move);
+                all_current_halite[ship_idx].push_back(ship.halite);
+                all_current_res[ship_idx].push_back(ship.halite_per_turn);
+#endif
             }
 
             // Destroy ships
@@ -509,6 +526,20 @@ struct MctsSimulation {
                 res[ship_idx] = ((float)ship.halite)/(ship.turns_underway+remaining_turns);
             }
         }
+
+#ifdef DEBUG
+        std::cerr << "simulation" << std::endl;
+        std::cerr << moves << std::endl;
+        for (size_t ship_idx=0; ship_idx < ships.size(); ship_idx++) {
+            for (int move_idx=0; move_idx < all_taken_moves[ship_idx].size(); move_idx++) {
+                std::cerr << all_taken_moves[ship_idx][move_idx] << ":"
+                    << all_current_halite[ship_idx][move_idx] << "="
+                    << all_current_res[ship_idx][move_idx] << " ";
+            }
+            std::cerr << "= " << res[ship_idx] << std::endl;
+        }
+#endif
+
         return res;
     }
 
@@ -538,7 +569,7 @@ void MctsBot::init(hlt::Game& game) {
         }
     }
 
-    auto dropoff_pull = hlt::constants::MAX_HALITE*hlt::constants::MAX_HALITE;
+    auto dropoff_pull = (10*hlt::constants::MAX_HALITE)*(10*hlt::constants::MAX_HALITE);
     return_grids = std::vector<GravityGrid>();
     for (auto player : game.players) {
         GravityGrid grid(map.width, map.height);
@@ -576,7 +607,10 @@ void MctsBot::maintain(const hlt::Game& game) {
 }
 
 std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_time) {
-//    if (game.turn_number > 2) { throw "die"; }
+#ifdef DEBUG
+    if (game.turn_number > 10) { throw "die"; }
+    std::cerr << "turn: " << game.turn_number << std::endl;
+#endif
     maintain(game);
 
     Frame frame(game);
@@ -632,7 +666,9 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
     // Run simulations and update trees
     int depth = 0;
     for (auto now = ms_clock::now(); now < end_time; now = ms_clock::now()) {
-        //if (depth == 4000) break;
+#ifdef DEBUG
+        if (depth == 10) break;
+#endif
         depth++;
 
         for (size_t ship_idx=0; ship_idx < mcts_trees.size(); ship_idx++) {
