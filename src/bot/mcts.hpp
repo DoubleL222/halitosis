@@ -1,9 +1,14 @@
 #pragma once
 
 #include "bot/bot.hpp"
+#include "bot/gravity_grid.hpp"
 
 class MctsBot : public Bot {
     unsigned int seed;
+    // Grid shared by all players for mining purposes
+    GravityGrid mining_grid;
+    // Grids for each player used to return to dropoffs
+    std::vector<GravityGrid> return_grids;
 
 public:
     MctsBot(unsigned int seed);

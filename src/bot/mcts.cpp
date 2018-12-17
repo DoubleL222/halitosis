@@ -218,17 +218,62 @@ struct SimulatedShip {
 };
 
 struct RandomPolicy {
-    std::mt19937 generator;
+    int get_move(std::mt19937& generator) {
+        // distribution is inclusive
+        std::uniform_int_distribution<int> distribution(1, ALL_DIRECTIONS.size()-1);
+        return distribution(generator);
+    }
+};
 
-    RandomPolicy(unsigned int seed)
-      : generator(seed)
+struct GravityPolicy {
+    GravityGrid& mining_grid;
+    GravityGrid& return_grid;
+
+    GravityPolicy(GravityGrid& mining_grid, GravityGrid& return_grid)
+      : mining_grid(mining_grid),
+        return_grid(return_grid)
     {
     }
 
-    int get_move(const SimulatedShip& ship) {
-        // distribution is inclusive
-        std::uniform_int_distribution<int> distribution(0, ALL_DIRECTIONS.size()-1);
-        return distribution(generator);
+    int get_move(std::mt19937& generator, int position, hlt::Halite current_halite) {
+        float pull_fraction =
+            ((float)hlt::constants::MAX_HALITE-current_halite)/hlt::constants::MAX_HALITE;
+        float return_fraction = 1.0-pull_fraction;
+
+        float pulls[ALL_DIRECTIONS.size()] = {0};
+        for (size_t move=1; move < ALL_DIRECTIONS.size(); move++) {
+            pulls[move] += pull_fraction*mining_grid.get_pull(position, move);
+            pulls[move] += return_fraction*return_grid.get_pull(position, move);
+        }
+
+        float pull_sum = 0;
+        for (auto v : pulls) {
+            pull_sum += v;
+        }
+
+        float rand = std::uniform_real_distribution<float>()(generator);
+        float move_treshold = 0;
+        for (size_t move=1; move < ALL_DIRECTIONS.size(); move++) {
+            move_treshold += pulls[move]/pull_sum;
+            if (rand < move_treshold) return move;
+        }
+        return STILL_INDEX;
+    }
+};
+
+struct MiningPolicy {
+    int map_size;
+
+    MiningPolicy(int map_size)
+      : map_size(map_size)
+    {
+    }
+
+    bool should_mine(std::mt19937& generator, hlt::Halite halite_at_position, hlt::Halite total_halite) {
+        float average_halite = ((float)total_halite)/map_size;
+        float treshold = halite_at_position/(2*average_halite);
+        float rand = std::uniform_real_distribution<float>()(generator);
+        return rand < treshold;
     }
 };
 
@@ -236,17 +281,30 @@ struct MctsSimulation {
     const Frame& frame;
     int width;
     int height;
-    RandomPolicy policy;
+
     std::vector<SimulatedShip> original_ships;
     std::vector<hlt::Halite> original_halite;
+    hlt::Halite total_halite;
 
-    MctsSimulation(unsigned int seed, const Frame& frame, std::vector<std::shared_ptr<hlt::Ship>>& ships)
+    std::mt19937 generator;
+    MiningPolicy mining_policy;
+    std::vector<GravityPolicy> move_policies;
+    //RandomPolicy move_policy;
+
+    MctsSimulation(
+        unsigned int seed,
+        const Frame& frame,
+        std::vector<std::shared_ptr<hlt::Ship>>& ships,
+        std::vector<GravityPolicy> move_policies
+    )
       : frame(frame),
         width(frame.get_game().game_map->width),
         height(frame.get_game().game_map->height),
-        policy(seed),
         original_ships(ships.size()),
-        original_halite(frame.get_board_size())
+        original_halite(frame.get_board_size()),
+        generator(seed),
+        mining_policy(width*height),
+        move_policies(move_policies)
     {
         for (size_t i=0; i<ships.size(); i++) {
             auto ship = ships[i];
@@ -263,6 +321,7 @@ struct MctsSimulation {
                 hlt::Position pos(x, y);
                 auto idx = frame.get_index(pos);
                 original_halite[idx] = frame.get_game().game_map->at(pos)->halite;
+                total_halite += original_halite[idx];
             }
         }
     }
@@ -301,9 +360,19 @@ struct MctsSimulation {
                     num_inspiring_ships[ship.position]-num_own_inspiring_ships[ship.player][ship.position];
                 bool is_inspired = (inspiration_count >= hlt::constants::INSPIRATION_SHIP_COUNT);
 
-                auto move = moves.is_move_specified(ship_idx, depth)
-                    ? moves.get_move(ship_idx, depth)
-                    : policy.get_move(ship);
+                int move;
+                if (moves.is_move_specified(ship_idx, depth)) {
+                    move = moves.get_move(ship_idx, depth);
+                } else {
+                    bool should_mine =
+                        mining_policy.should_mine(generator, halite[ship.position], total_halite);
+                    if (should_mine) {
+                        move = STILL_INDEX;
+                    } else {
+                        auto& policy = move_policies[ship.player];
+                        move = policy.get_move(generator, ship.position, ship.stored_halite);
+                    }
+                }
                 // Not possible to move
                 if (halite[ship.position]/hlt::constants::MOVE_COST_RATIO > ship.stored_halite) {
                     move = STILL_INDEX;
@@ -330,7 +399,7 @@ struct MctsSimulation {
                     num_ships_in_cell[ship.position]++;
                 }
             }
-            
+
             // Destroy ships
             for (auto& ship : ships) {
                 if (num_ships_in_cell[ship.position] > 1) {
@@ -386,17 +455,45 @@ struct MctsSimulation {
 };
 
 MctsBot::MctsBot(unsigned int seed)
-  : seed(seed)
+  : seed(seed),
+    mining_grid(0, 0)
 {
 }
 
 void MctsBot::init(hlt::Game& game) {
+    auto& map = *game.game_map;
+
+    mining_grid = GravityGrid(map.width, map.height);
+    for (int y=0; y < map.height; y++) {
+        for (int x=0; x < map.width; x++) {
+            auto halite = map.at(hlt::Position(x, y))->halite;
+            mining_grid.add_gravity(x, y, halite*halite);
+        }
+    }
+
+    auto dropoff_pull = hlt::constants::MAX_HALITE*hlt::constants::MAX_HALITE;
+    return_grids = std::vector<GravityGrid>();
+    for (auto player : game.players) {
+        GravityGrid grid(map.width, map.height);
+        auto shipyard_pos = player->shipyard->position;
+        grid.add_gravity(shipyard_pos.x, shipyard_pos.y, dropoff_pull);
+        // TODO dropoffs
+        return_grids.push_back(grid);
+    }
     game.ready("mcts");
 }
 
 std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_time) {
     Frame frame(game);
 //    if (game.turn_number > 2) { throw "die"; }
+
+    // Update the existing gravity grid so no significant time is spend on it each turn.
+    for (int y=0; y < game.game_map->height; y++) {
+        for (int x=0; x < game.game_map->width; x++) {
+            auto halite = game.game_map->at(hlt::Position(x, y))->halite;
+            mining_grid.set_gravity(x, y, halite*halite);
+        }
+    }
 
     std::vector<std::shared_ptr<hlt::Ship>> all_ships;
     for (auto player : game.players) {
@@ -407,7 +504,11 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
 
     // Run simulations and update trees
     std::vector<MctsTreeNode> mcts_trees(all_ships.size());
-    MctsSimulation simulation(seed, frame, all_ships);
+    std::vector<GravityPolicy> move_policies;
+    for (size_t player_idx=0; player_idx < game.players.size(); player_idx++) {
+        move_policies.push_back(GravityPolicy(mining_grid, return_grids[player_idx]));
+    }
+    MctsSimulation simulation(seed, frame, all_ships, move_policies);
     ShipMoves simulation_moves(all_ships.size());
 
     int depth = 0;
