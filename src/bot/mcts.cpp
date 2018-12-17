@@ -11,6 +11,10 @@ const float EXPLORATION_CONSTANT = std::sqrt(2.0);
 // The maximum depth that moves will be generated for
 const int MAX_DEPTH = 50;
 
+// Number of simulations used to generate a score to beat when we don't have one from the previous
+// turn
+const int NUM_INIT_SIMULATIONS = 10;
+
 // A container for moves that allows faster access than a vec of vecs
 struct ShipMoves {
     int num_ships;
@@ -77,7 +81,6 @@ std::ostream& operator<<(std::ostream& os, const ShipMoves& moves) {
     return os;
 }
 
-
 struct MctsTreeNode {
     int visits;
     float total_reward;
@@ -134,12 +137,12 @@ struct MctsTreeNode {
     //             v ← BESTCHILD(v, Cp)
     //     return v
     //
-    void tree_policy_rec(ShipMoves& moves, int ship_idx) {
+    void tree_policy(ShipMoves& moves, int ship_idx) {
         if (is_expanded()) {
             int best_child = get_best_child();
             moves.push(ship_idx, best_child);
             if (!moves.is_move_specified(ship_idx, MAX_DEPTH-1)) {
-                children[best_child]->tree_policy_rec(moves, ship_idx);
+                children[best_child]->tree_policy(moves, ship_idx);
             }
         } else {
             // Expand
@@ -147,12 +150,6 @@ struct MctsTreeNode {
                 children.push_back(std::make_unique<MctsTreeNode>());
             }
         }
-    }
-
-    // Sets the path in the moves struct instead of returning a newly allocated path.
-    void tree_policy(ShipMoves& moves, int ship_idx) {
-        moves.clear(ship_idx);
-        tree_policy_rec(moves, ship_idx);
     }
 
     void update_rec(const ShipMoves& moves, int depth, int ship_idx, float reward) {
@@ -183,12 +180,66 @@ std::ostream& operator<<(std::ostream& os, const MctsTreeNode& node) {
     return os;
 }
 
+struct MctsTree {
+    // Scores to compare against. A score > this value is counted as a win, while less than this is
+    // a draw.
+    // Usually the previous average scores are compared against.
+    float comparison_score;
+    // Sum of current scores to compute the average.
+    float current_score_sum;
+
+    MctsTreeNode root;
+
+    MctsTree(float comparison_score)
+      : comparison_score(comparison_score),
+        current_score_sum(0)
+    {
+    }
+
+    // Get the best move found by the mcts
+    hlt::Direction best_move() {
+        return root.best_move();
+    }
+
+    // Sets the path in the moves struct instead of returning a newly allocated path.
+    void tree_policy(ShipMoves& moves, int ship_idx) {
+        moves.clear(ship_idx);
+        root.tree_policy(moves, ship_idx);
+    }
+
+    // Update the tree using a score that does not need to be normalized.
+    void update(const ShipMoves& moves, int ship_idx, float score) {
+        current_score_sum += score;
+        float reward = 0.5;
+        if (score > comparison_score) { reward = 1.0; }
+        if (score < comparison_score) { reward = 0.0; }
+        root.update(moves, ship_idx, reward);
+    }
+
+    // Retrieve the average score that the ship has gained across all simulations.
+    float get_average_score() {
+        return current_score_sum/root.visits;
+    }
+};
+
 struct SimulatedShip {
     int position;
-    hlt::Halite stored_halite;
-    hlt::Halite deposited_halite;
-    hlt::PlayerId player;
+    hlt::Halite halite;
+    int turns_underway;
+    // Set to -1 if the dropoff has not been reached yet.
+    float halite_per_turn;
     bool destroyed;
+    hlt::PlayerId player;
+
+    SimulatedShip(int position, hlt::Halite halite, int turns_underway, hlt::PlayerId player)
+      : position(position),
+        halite(halite),
+        turns_underway(turns_underway),
+        halite_per_turn(-1),
+        destroyed(false),
+        player(player)
+    {
+    }
 
     void move(int move, int width, int height) {
         switch (move) {
@@ -291,40 +342,54 @@ struct MctsSimulation {
     std::vector<GravityPolicy> move_policies;
     //RandomPolicy move_policy;
 
+    // The distances to each dropoff from each position for each player
+    std::vector<std::vector<int>> distance_to_dropoff;
+
     MctsSimulation(
         std::mt19937& generator,
         const Frame& frame,
-        std::vector<std::shared_ptr<hlt::Ship>>& ships,
+        std::vector<SimulatedShip> ships,
         std::vector<GravityPolicy> move_policies
     )
       : frame(frame),
         width(frame.get_game().game_map->width),
         height(frame.get_game().game_map->height),
-        original_ships(ships.size()),
+        original_ships(ships),
         original_halite(frame.get_board_size()),
         total_halite(0),
         generator(generator),
         mining_policy(width*height),
         move_policies(move_policies)
     {
-        for (size_t i=0; i<ships.size(); i++) {
-            auto ship = ships[i];
-            auto& orig_ship = original_ships[i];
-            orig_ship.position = frame.get_index(ship->position);
-            orig_ship.stored_halite = ship->halite;
-            orig_ship.deposited_halite = 0;
-            orig_ship.player = ship->owner;
-            orig_ship.destroyed = false;
-        }
-
+        auto& game_map = frame.get_game().game_map;
+        // Initialize halite
         for (int y=0; y < height; y++) {
             for (int x=0; x < width; x++) {
                 hlt::Position pos(x, y);
                 auto idx = frame.get_index(pos);
-                original_halite[idx] = frame.get_game().game_map->at(pos)->halite;
+                original_halite[idx] = game_map->at(pos)->halite;
                 total_halite += original_halite[idx];
             }
         }
+
+        // Initialize distance_to_dropoff
+        for (auto player : frame.get_game().players) {
+            std::vector<int> distances(width*height);
+            for (int y=0; y < height; y++) {
+                for (int x=0; x < width; x++) {
+                    int shipyard_dist = game_map->calculate_distance(
+                        hlt::Position(x, y),
+                        player->shipyard->position
+                    );
+                    distances[y*width+x] = shipyard_dist;
+                }
+            }
+            distance_to_dropoff.push_back(distances);
+        }
+    }
+
+    int get_distance_to_dropoff(int pos, int player) {
+        return distance_to_dropoff[player][pos];
     }
 
     std::vector<float> run(const ShipMoves& moves, int max_depth) {
@@ -371,11 +436,11 @@ struct MctsSimulation {
                         move = STILL_INDEX;
                     } else {
                         auto& policy = move_policies[ship.player];
-                        move = policy.get_move(generator, ship.position, ship.stored_halite);
+                        move = policy.get_move(generator, ship.position, ship.halite);
                     }
                 }
                 // Not possible to move
-                if (halite[ship.position]/hlt::constants::MOVE_COST_RATIO > ship.stored_halite) {
+                if (halite[ship.position]/hlt::constants::MOVE_COST_RATIO > ship.halite) {
                     move = STILL_INDEX;
                 }
                 taken_moves[ship_idx] = move;
@@ -384,20 +449,24 @@ struct MctsSimulation {
                     auto max_mined = ceil_div(halite[ship.position], hlt::constants::EXTRACT_RATIO);
                     if (is_inspired) { max_mined *= hlt::constants::INSPIRED_BONUS_MULTIPLIER; }
 
-                    auto old_halite = ship.stored_halite;
-                    ship.stored_halite += max_mined;
-                    ship.stored_halite =
-                        std::max(0, std::min(hlt::constants::MAX_HALITE, ship.stored_halite));
+                    auto old_halite = ship.halite;
+                    ship.halite += max_mined;
+                    ship.halite =
+                        std::max(0, std::min(hlt::constants::MAX_HALITE, ship.halite));
 
-                    auto removed_halite = ship.stored_halite-old_halite;
+                    auto removed_halite = ship.halite-old_halite;
                     if (is_inspired) { removed_halite /= hlt::constants::INSPIRED_BONUS_MULTIPLIER; }
                     halite[ship.position] -= removed_halite;
                 } else {
                     // Moving
-                    ship.stored_halite -= halite[ship.position]/hlt::constants::MOVE_COST_RATIO;
+                    ship.halite -= halite[ship.position]/hlt::constants::MOVE_COST_RATIO;
                     num_ships_in_cell[ship.position]--;
-                    ships[ship_idx].move(move, width, height);
+                    ship.move(move, width, height);
                     num_ships_in_cell[ship.position]++;
+                }
+                ship.turns_underway++;
+                if (get_distance_to_dropoff(ship.position, ship.player) == 0) {
+                    ship.halite_per_turn = ((float)ship.halite)/ship.turns_underway;
                 }
             }
 
@@ -405,7 +474,7 @@ struct MctsSimulation {
             for (auto& ship : ships) {
                 if (num_ships_in_cell[ship.position] > 1) {
                     ship.destroyed = true;
-                    ship.stored_halite = 0;
+                    ship.halite = 0;
                 }
             }
             for (auto& ship : ships) {
@@ -423,24 +492,21 @@ struct MctsSimulation {
             }
         }
 
-        std::vector<hlt::Halite> collected_halite(ships.size());
-        // Set gain of each ship
-        for (size_t ship_idx=0; ship_idx < ships.size(); ship_idx++) {
-            auto total_halite = ships[ship_idx].stored_halite+ships[ship_idx].deposited_halite;
-            collected_halite[ship_idx] = total_halite-original_ships[ship_idx].stored_halite;
-        }
-        hlt::Halite min_gain = 100000;
-        hlt::Halite max_gain = -100000;
-        for (auto v : collected_halite) {
-            min_gain = std::min(min_gain, v);
-            max_gain = std::max(max_gain, v);
-        }
         std::vector<float> res(ships.size());
-        for (size_t ship_idx = 0; ship_idx < ships.size(); ship_idx++) {
-            if (min_gain == max_gain) {
-                res[ship_idx] = 0.5;
+        for (size_t ship_idx=0; ship_idx < ships.size(); ship_idx++) {
+            auto& ship = ships[ship_idx];
+            if (ship.destroyed) {
+                res[ship_idx] = 0.0;
+            } else if (ship.halite_per_turn >= 0) {
+                res[ship_idx] = ship.halite_per_turn;
             } else {
-                res[ship_idx] = ((float)(collected_halite[ship_idx]-min_gain))/(max_gain-min_gain);
+                // An estimate of turns needed to reach a dropoff, assuming each cell has
+                // an equal, non-zero amount of halite
+                float turns_spent_mining =
+                    ((float)hlt::constants::EXTRACT_RATIO)/hlt::constants::MOVE_COST_RATIO;
+                float remaining_turns =
+                    get_distance_to_dropoff(ship.position, ship.player)*(1.0+turns_spent_mining);
+                res[ship_idx] = ((float)ship.halite)/(ship.turns_underway+remaining_turns);
             }
         }
         return res;
@@ -481,37 +547,89 @@ void MctsBot::init(hlt::Game& game) {
         // TODO dropoffs
         return_grids.push_back(grid);
     }
+
     game.ready("mcts");
 }
 
-std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_time) {
-    Frame frame(game);
-//    if (game.turn_number > 2) { throw "die"; }
-
+void MctsBot::maintain(const hlt::Game& game) {
+    auto& game_map = *game.game_map;
     // Update the existing gravity grid so no significant time is spend on it each turn.
-    for (int y=0; y < game.game_map->height; y++) {
-        for (int x=0; x < game.game_map->width; x++) {
-            auto halite = game.game_map->at(hlt::Position(x, y))->halite;
+    for (int y=0; y < game_map.height; y++) {
+        for (int x=0; x < game_map.width; x++) {
+            auto halite = game_map.at(hlt::Position(x, y))->halite;
             mining_grid.set_gravity(x, y, halite*halite);
         }
     }
 
+    // Update turns_underway
+    for (auto player : game.players) {
+        for (auto id_ship : player->ships) {
+            auto cell = game_map.at(id_ship.second->position);
+            if (cell->structure && cell->structure->owner == player->id) {
+                turns_underway[id_ship.first] = 0;
+            } else {
+                // Will insert if it is not already there.
+                turns_underway[id_ship.first]++;
+            }
+        }
+    }
+}
+
+std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_time) {
+//    if (game.turn_number > 2) { throw "die"; }
+    maintain(game);
+
+    Frame frame(game);
+
+    // Get list of all ships
     std::vector<std::shared_ptr<hlt::Ship>> all_ships;
     for (auto player : game.players) {
         for (auto id_ship : player->ships) {
             all_ships.push_back(id_ship.second);
         }
     }
+    std::vector<SimulatedShip> simulation_ships;
+    for (auto ship : all_ships) {
+        SimulatedShip simulated(
+            frame.get_index(ship->position),
+            ship->halite,
+            turns_underway[ship->id],
+            ship->owner
+        );
+        simulation_ships.push_back(simulated);
+    }
 
-    // Run simulations and update trees
-    std::vector<MctsTreeNode> mcts_trees(all_ships.size());
+    // Setup simulation
     std::vector<GravityPolicy> move_policies;
     for (size_t player_idx=0; player_idx < game.players.size(); player_idx++) {
         move_policies.push_back(GravityPolicy(mining_grid, return_grids[player_idx]));
     }
-    MctsSimulation simulation(generator, frame, all_ships, move_policies);
-    ShipMoves simulation_moves(all_ships.size());
+    MctsSimulation simulation(generator, frame, simulation_ships, move_policies);
 
+    ShipMoves simulation_moves(all_ships.size());
+    // Run simulations where no moves have been specified.
+    // Only used to initialize expectations for ships at dropoffs as its expectation is of lower quality.
+    std::vector<float> simulation_score_sum(all_ships.size());
+    for (int i=0; i < NUM_INIT_SIMULATIONS; i++) {
+        auto res = simulation.run(simulation_moves, MAX_DEPTH);
+        for (size_t ship_idx=0; ship_idx < res.size(); ship_idx++) {
+            simulation_score_sum[ship_idx] += res[ship_idx];
+        }
+    }
+
+    // Setup mcts trees
+    std::vector<MctsTree> mcts_trees;
+    for (size_t ship_idx=0; ship_idx < simulation_ships.size(); ship_idx++) {
+        float comparison_score = 0;
+        if (simulation_ships[ship_idx].turns_underway == 0) {
+            comparison_score = simulation_score_sum[ship_idx]/NUM_INIT_SIMULATIONS;
+        } else {
+            comparison_score = last_average_scores[all_ships[ship_idx]->id];
+        }
+        mcts_trees.emplace_back(comparison_score);
+    }
+
+    // Run simulations and update trees
     int depth = 0;
     for (auto now = ms_clock::now(); now < end_time; now = ms_clock::now()) {
         //if (depth == 4000) break;
@@ -543,6 +661,11 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
 */
     }
     std::cerr << "depth: " << depth  << std::endl;
+
+    // Update last_average_scores
+    for (size_t ship_idx=0; ship_idx < all_ships.size(); ship_idx++) {
+        last_average_scores[all_ships[ship_idx]->id] = mcts_trees[ship_idx].get_average_score();
+    }
 
     std::vector<hlt::Command> commands;
     for (size_t ship_idx=0; ship_idx < all_ships.size(); ship_idx++) {
