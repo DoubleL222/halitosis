@@ -4,7 +4,8 @@
 #include "bot/gravity_grid.hpp"
 
 class MctsBot : public Bot {
-    unsigned int seed;
+    // Rng
+    std::mt19937 generator;
     // Grid shared by all players for mining purposes
     GravityGrid mining_grid;
     // Grids for each player used to return to dropoffs

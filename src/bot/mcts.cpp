@@ -286,13 +286,13 @@ struct MctsSimulation {
     std::vector<hlt::Halite> original_halite;
     hlt::Halite total_halite;
 
-    std::mt19937 generator;
+    std::mt19937& generator;
     MiningPolicy mining_policy;
     std::vector<GravityPolicy> move_policies;
     //RandomPolicy move_policy;
 
     MctsSimulation(
-        unsigned int seed,
+        std::mt19937& generator,
         const Frame& frame,
         std::vector<std::shared_ptr<hlt::Ship>>& ships,
         std::vector<GravityPolicy> move_policies
@@ -302,7 +302,8 @@ struct MctsSimulation {
         height(frame.get_game().game_map->height),
         original_ships(ships.size()),
         original_halite(frame.get_board_size()),
-        generator(seed),
+        total_halite(0),
+        generator(generator),
         mining_policy(width*height),
         move_policies(move_policies)
     {
@@ -455,7 +456,7 @@ struct MctsSimulation {
 };
 
 MctsBot::MctsBot(unsigned int seed)
-  : seed(seed),
+  : generator(seed),
     mining_grid(0, 0)
 {
 }
@@ -508,7 +509,7 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
     for (size_t player_idx=0; player_idx < game.players.size(); player_idx++) {
         move_policies.push_back(GravityPolicy(mining_grid, return_grids[player_idx]));
     }
-    MctsSimulation simulation(seed, frame, all_ships, move_policies);
+    MctsSimulation simulation(generator, frame, all_ships, move_policies);
     ShipMoves simulation_moves(all_ships.size());
 
     int depth = 0;
