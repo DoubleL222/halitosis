@@ -635,6 +635,7 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
     maintain(game);
 
     Frame frame(game);
+    int turns_left = hlt::constants::MAX_TURNS-game.turn_number;
 
     // Get list of all ships
     std::vector<std::shared_ptr<hlt::Ship>> all_ships;
@@ -726,13 +727,23 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
         last_average_scores[all_ships[ship_idx]->id] = mcts_trees[ship_idx].get_average_score();
     }
 
+    float halite_per_turn_sum = 0;
     std::unordered_map<hlt::EntityId, hlt::Direction> own_moves;
     for (size_t ship_idx=0; ship_idx < all_ships.size(); ship_idx++) {
         if (all_ships[ship_idx]->owner == game.my_id) {
             own_moves[all_ships[ship_idx]->id] = mcts_trees[ship_idx].best_move();
+            halite_per_turn_sum += mcts_trees[ship_idx].get_average_score();
         }
     }
-    bool spawn_desired = (game.me->halite >= 1000);
+    bool spawn_desired = true;
+    if (own_moves.size() > 0) {
+        float expected_halite_per_turn = halite_per_turn_sum/own_moves.size();
+        float expected_halite_total = expected_halite_per_turn*turns_left;
+        bool can_build_ship = (game.me->halite >= hlt::constants::SHIP_COST);
+        if (!can_build_ship || expected_halite_total < hlt::constants::SHIP_COST) {
+            spawn_desired = false;
+        }
+    }
     auto collision_res = frame.avoid_collisions(own_moves, false, spawn_desired);
 
     std::vector<hlt::Command> commands;
