@@ -726,13 +726,20 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
         last_average_scores[all_ships[ship_idx]->id] = mcts_trees[ship_idx].get_average_score();
     }
 
-    std::vector<hlt::Command> commands;
+    std::unordered_map<hlt::EntityId, hlt::Direction> own_moves;
     for (size_t ship_idx=0; ship_idx < all_ships.size(); ship_idx++) {
         if (all_ships[ship_idx]->owner == game.my_id) {
-            commands.push_back(all_ships[ship_idx]->move(mcts_trees[ship_idx].best_move()));
+            own_moves[all_ships[ship_idx]->id] = mcts_trees[ship_idx].best_move();
         }
     }
-    if (game.me->halite >= 1000) {
+    bool spawn_desired = (game.me->halite >= 1000);
+    auto collision_res = frame.avoid_collisions(own_moves, false, spawn_desired);
+
+    std::vector<hlt::Command> commands;
+    for (auto id_ship : game.me->ships) {
+        commands.push_back(id_ship.second->move(collision_res.safe_moves[id_ship.first]));
+    }
+    if (collision_res.is_spawn_possible) {
         commands.push_back(game.me->shipyard->spawn());
     }
     return commands;
