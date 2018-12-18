@@ -242,32 +242,6 @@ struct SimulatedShip {
         player(player)
     {
     }
-
-    void move(int move, int width, int height) {
-        switch (move) {
-            case STILL_INDEX:
-                break;
-            case NORTH_INDEX:
-                position = pos_mod(position-width, width*height);
-                break;
-            case SOUTH_INDEX:
-                position = (position+width)%(width*height);
-                break;
-            case EAST_INDEX:
-                if (position%width == width-1) {
-                    position -= width-1;
-                } else {
-                    position += 1;
-                }
-            case WEST_INDEX:
-                if (position%width == 0) {
-                    position += width-1;
-                } else {
-                    position -= 1;
-                }
-                break;
-        }
-    }
 };
 
 struct RandomPolicy {
@@ -288,29 +262,48 @@ struct GravityPolicy {
     {
     }
 
-    int get_move(std::mt19937& generator, int position, hlt::Halite current_halite) {
+    float get_move_weight(int move, int position, hlt::Halite current_halite) {
         float pull_fraction =
             ((float)hlt::constants::MAX_HALITE-current_halite)/hlt::constants::MAX_HALITE;
         float return_fraction = 1.0-pull_fraction;
+        float res = 0;
+        res += pull_fraction*mining_grid.get_pull(position, move);
+        res += return_fraction*return_grid.get_pull(position, move);
+        return res;
+    }
+};
 
-        float pulls[ALL_DIRECTIONS.size()] = {0};
+// Wrapper around other policies that allows removing moves
+// This is useful for avoiding collisions in rollouts.
+struct MovePolicy {
+    GravityPolicy policy;
+
+    MovePolicy(GravityPolicy policy)
+      : policy(policy)
+    {
+    }
+
+    int get_move(std::mt19937& rng, int position, hlt::Halite current_halite, bool allowed_moves[4]) {
+        float weights[4];
         for (size_t move=1; move < ALL_DIRECTIONS.size(); move++) {
-            pulls[move] += pull_fraction*mining_grid.get_pull(position, move);
-            pulls[move] += return_fraction*return_grid.get_pull(position, move);
+            if (allowed_moves[move-1]) {
+                weights[move-1] = policy.get_move_weight(move, position, current_halite);
+            } else {
+                weights[move-1] = 0;
+            }
         }
 
-        float pull_sum = 0;
-        for (auto v : pulls) {
-            pull_sum += v;
-        }
+        float sum_weights = 0;
+        for (auto w : weights) { sum_weights += w; }
+        if (sum_weights == 0) { return 0; }
 
-        float rand = std::uniform_real_distribution<float>()(generator);
+        float rand = std::uniform_real_distribution<float>()(rng);
         float move_treshold = 0;
-        for (size_t move=1; move < ALL_DIRECTIONS.size(); move++) {
-            move_treshold += pulls[move]/pull_sum;
-            if (rand < move_treshold) return move;
+        for (size_t move = 1; move < ALL_DIRECTIONS.size(); move++) {
+            move_treshold += weights[move-1]/sum_weights;
+            if (rand < move_treshold) { return move; }
         }
-        return STILL_INDEX;
+        return 0;
     }
 };
 
@@ -341,8 +334,7 @@ struct MctsSimulation {
 
     std::mt19937& generator;
     MiningPolicy mining_policy;
-    std::vector<GravityPolicy> move_policies;
-    //RandomPolicy move_policy;
+    std::vector<MovePolicy> move_policies;
 
     // The distances to each dropoff from each position for each player
     std::vector<std::vector<int>> distance_to_dropoff;
@@ -351,7 +343,7 @@ struct MctsSimulation {
         std::mt19937& generator,
         const Frame& frame,
         std::vector<SimulatedShip> ships,
-        std::vector<GravityPolicy> move_policies
+        std::vector<MovePolicy> move_policies
     )
       : frame(frame),
         width(frame.get_game().game_map->width),
@@ -387,6 +379,27 @@ struct MctsSimulation {
                 }
             }
             distance_to_dropoff.push_back(distances);
+        }
+    }
+
+    int move_position(int position, int move) {
+        switch (move) {
+            case STILL_INDEX: return position;
+            case NORTH_INDEX: return pos_mod(position-width, width*height);
+            case SOUTH_INDEX: return (position+width)%(width*height);
+            case EAST_INDEX:
+                if (position%width == width-1) {
+                    return position - (width-1);
+                } else {
+                    return position + 1;
+                }
+            case WEST_INDEX:
+                if (position%width == 0) {
+                    return position + (width-1);
+                } else {
+                    return position - 1;
+                }
+            default: return position;
         }
     }
 
@@ -445,7 +458,13 @@ struct MctsSimulation {
                         move = STILL_INDEX;
                     } else {
                         auto& policy = move_policies[ship.player];
-                        move = policy.get_move(generator, ship.position, ship.halite);
+                        // avoid collisions
+                        bool possible_moves[4];
+                        for (size_t move=1; move < ALL_DIRECTIONS.size(); move++) {
+                            int neighbor = move_position(ship.position, move);
+                            possible_moves[move-1] = (num_ships_in_cell[neighbor] == 0);
+                        }
+                        move = policy.get_move(generator, ship.position, ship.halite, possible_moves);
                     }
                 }
                 // Not possible to move
@@ -470,7 +489,7 @@ struct MctsSimulation {
                     // Moving
                     ship.halite -= halite[ship.position]/hlt::constants::MOVE_COST_RATIO;
                     num_ships_in_cell[ship.position]--;
-                    ship.move(move, width, height);
+                    ship.position = move_position(ship.position, move);
                     num_ships_in_cell[ship.position]++;
                 }
                 ship.turns_underway++;
@@ -634,9 +653,9 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
     }
 
     // Setup simulation
-    std::vector<GravityPolicy> move_policies;
+    std::vector<MovePolicy> move_policies;
     for (size_t player_idx=0; player_idx < game.players.size(); player_idx++) {
-        move_policies.push_back(GravityPolicy(mining_grid, return_grids[player_idx]));
+        move_policies.push_back(MovePolicy(GravityPolicy(mining_grid, return_grids[player_idx])));
     }
     MctsSimulation simulation(generator, frame, simulation_ships, move_policies);
 
@@ -712,5 +731,10 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
     if (game.me->halite >= 1000) {
         commands.push_back(game.me->shipyard->spawn());
     }
+    std::cerr << "commands: ";
+    for (auto cmd : commands) {
+        std::cerr << cmd << ", ";
+    }
+    std::cerr << std::endl;
     return commands;
 }
