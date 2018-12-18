@@ -109,7 +109,9 @@ struct MctsTreeNode {
                 best_total_reward = children[child_idx]->total_reward;
             }
         }
+#ifdef DEBUG
         std::cerr << "best_move: " << best_child << ": " << best_total_reward << "/" << best_visits << std::endl;
+#endif
         return ALL_DIRECTIONS[best_child];
     }
 
@@ -715,7 +717,9 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
         }
 */
     }
+#ifdef DEBUG
     std::cerr << "depth: " << depth  << std::endl;
+#endif
 
     // Update last_average_scores
     for (size_t ship_idx=0; ship_idx < all_ships.size(); ship_idx++) {
@@ -731,10 +735,5 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
     if (game.me->halite >= 1000) {
         commands.push_back(game.me->shipyard->spawn());
     }
-    std::cerr << "commands: ";
-    for (auto cmd : commands) {
-        std::cerr << cmd << ", ";
-    }
-    std::cerr << std::endl;
     return commands;
 }
