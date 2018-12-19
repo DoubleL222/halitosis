@@ -356,6 +356,10 @@ struct MctsSimulation {
     // The distances to each dropoff from each position for each player
     std::vector<std::vector<int>> distance_to_dropoff;
 
+    // Precalculated values
+    std::vector<int> orig_num_ships_in_cell;
+    std::vector<std::vector<int>> orig_num_own_ships_in_cell;
+
     MctsSimulation(
         std::mt19937& generator,
         const Frame& frame,
@@ -370,7 +374,8 @@ struct MctsSimulation {
         total_halite(0),
         generator(generator),
         mining_policy(width*height),
-        move_policies(move_policies)
+        move_policies(move_policies),
+        orig_num_ships_in_cell(width*height)
     {
         auto& game_map = frame.get_game().game_map;
         // Initialize halite
@@ -396,6 +401,18 @@ struct MctsSimulation {
                 }
             }
             distance_to_dropoff.push_back(distances);
+        }
+
+        // Initialize num_ships_in_cell
+        for (auto player : frame.get_game().players) {
+            std::vector<int> num_ships(width*height);
+            for (auto& ship : ships) {
+                if (ship.player == player->id) {
+                    num_ships[ship.position] = 1;
+                    orig_num_ships_in_cell[ship.position] = 1;
+                }
+            }
+            orig_num_own_ships_in_cell.push_back(num_ships);
         }
     }
 
@@ -430,7 +447,13 @@ struct MctsSimulation {
         std::vector<int> taken_moves(ships.size());
 
         // length = board_size
-        std::vector<int> num_ships_in_cell(frame.get_board_size());
+        std::vector<std::vector<int>> num_own_ships_in_cell(orig_num_own_ships_in_cell);
+        std::vector<int> num_ships_in_cell(orig_num_ships_in_cell);
+
+        // Number of moves used from the given moves. Usually will be equal to depth,
+        // but might not be in the case that a ship has been delayed due to collision avoidance.
+        std::vector<int> planned_moves_taken(ships.size());
+
         std::vector<hlt::Halite> halite(original_halite);
         // For each position, how many ships are within inspiration range
         std::vector<int> num_inspiring_ships(frame.get_board_size());
@@ -449,7 +472,6 @@ struct MctsSimulation {
         }
         // Initialization
         for (auto& ship : ships) {
-            num_ships_in_cell[ship.position] = 1;
             add_inspiration(num_inspiring_ships, ship.position, 1);
             add_inspiration(num_own_inspiring_ships[ship.player], ship.position, 1);
         }
@@ -466,8 +488,15 @@ struct MctsSimulation {
                 bool is_inspired = (inspiration_count >= hlt::constants::INSPIRATION_SHIP_COUNT);
 
                 int move;
-                if (moves.is_move_specified(ship_idx, depth)) {
-                    move = moves.get_move(ship_idx, depth);
+                if (moves.is_move_specified(ship_idx, planned_moves_taken[ship_idx])) {
+                    move = moves.get_move(ship_idx, planned_moves_taken[ship_idx]);
+                    int neighbor = move_position(ship.position, move);
+                    // Only avoid own ships in searched nodes. Opponents might not be as nice as we are.
+                    if (move != STILL_INDEX && num_own_ships_in_cell[ship.player][neighbor] != 0) {
+                        move = STILL_INDEX;
+                    } else {
+                        planned_moves_taken[ship_idx]++;
+                    }
                 } else {
                     bool should_mine =
                         mining_policy.should_mine(generator, halite[ship.position], total_halite);
@@ -477,6 +506,8 @@ struct MctsSimulation {
                         auto& policy = move_policies[ship.player];
                         // avoid collisions
                         bool possible_moves[4];
+                        // Avoid all collisions when using default policy
+                        // Collisions can be avoided anyway, so should not fear going closer
                         for (size_t move=1; move < ALL_DIRECTIONS.size(); move++) {
                             int neighbor = move_position(ship.position, move);
                             possible_moves[move-1] = (num_ships_in_cell[neighbor] == 0);
@@ -506,8 +537,10 @@ struct MctsSimulation {
                     // Moving
                     ship.halite -= halite[ship.position]/hlt::constants::MOVE_COST_RATIO;
                     num_ships_in_cell[ship.position]--;
+                    num_own_ships_in_cell[ship.player][ship.position]--;
                     ship.position = move_position(ship.position, move);
                     num_ships_in_cell[ship.position]++;
+                    num_own_ships_in_cell[ship.player][ship.position]++;
                 }
                 ship.turns_underway++;
                 if (get_distance_to_dropoff(ship.position, ship.player) == 0
@@ -528,6 +561,7 @@ struct MctsSimulation {
                 if (num_ships_in_cell[ship.position] > 1) {
                     ship.destroyed = true;
                     ship.halite = 0;
+                    num_own_ships_in_cell[ship.player][ship.position] = 0;
                 }
             }
             for (auto& ship : ships) {
