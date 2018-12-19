@@ -21,6 +21,9 @@ const int NUM_INIT_SIMULATIONS = 10;
 // If set to false, simulations will be reused to update all trees.
 const bool ISOLATE_SHIPS = false;
 
+// Inspiration can be costly
+const bool INSPIRATION_ENABLED = false;
+
 // A container for moves that allows faster access than a vec of vecs
 struct ShipMoves {
     int num_ships;
@@ -360,6 +363,11 @@ struct MctsSimulation {
     std::vector<int> orig_num_ships_in_cell;
     std::vector<std::vector<int>> orig_num_own_ships_in_cell;
 
+    // For each position, how many ships are within inspiration range
+    std::vector<int> orig_num_inspiring_ships;
+    // For each player, how many own ships within range to subtract.
+    std::vector<std::vector<int>> orig_num_own_inspiring_ships;
+
     MctsSimulation(
         std::mt19937& generator,
         const Frame& frame,
@@ -375,7 +383,8 @@ struct MctsSimulation {
         generator(generator),
         mining_policy(width*height),
         move_policies(move_policies),
-        orig_num_ships_in_cell(width*height)
+        orig_num_ships_in_cell(width*height),
+        orig_num_inspiring_ships(width*height)
     {
         auto& game_map = frame.get_game().game_map;
         // Initialize halite
@@ -413,6 +422,34 @@ struct MctsSimulation {
                 }
             }
             orig_num_own_ships_in_cell.push_back(num_ships);
+        }
+
+        // Initialize inspiration
+        for (size_t i=0; i < frame.get_game().players.size(); i++) {
+            orig_num_own_inspiring_ships.push_back(std::vector<int>(width*height));
+        }
+        for (auto& ship : ships) {
+            add_inspiration(orig_num_inspiring_ships, ship.position, 1);
+            add_inspiration(orig_num_own_inspiring_ships[ship.player], ship.position, 1);
+        }
+    }
+
+    int move_position(int position, int dx, int dy) {
+        int x = position%width;
+        int y = position/width;
+        x = pos_mod(x+dx, width);
+        y = pos_mod(y+dy, height);
+        return frame.get_index(hlt::Position(x, y));
+    }
+
+    int reverse_move(int move) {
+        switch (move) {
+            case STILL_INDEX: return STILL_INDEX;
+            case NORTH_INDEX: return SOUTH_INDEX;
+            case SOUTH_INDEX: return NORTH_INDEX;
+            case EAST_INDEX: return WEST_INDEX;
+            case WEST_INDEX: return EAST_INDEX;
+            default: return STILL_INDEX;
         }
     }
 
@@ -456,9 +493,9 @@ struct MctsSimulation {
 
         std::vector<hlt::Halite> halite(original_halite);
         // For each position, how many ships are within inspiration range
-        std::vector<int> num_inspiring_ships(frame.get_board_size());
+        std::vector<int> num_inspiring_ships(orig_num_inspiring_ships);
         // For each player, how many own ships within range to subtract.
-        std::vector<std::vector<int>> num_own_inspiring_ships;
+        std::vector<std::vector<int>> num_own_inspiring_ships(orig_num_own_inspiring_ships);
 
 #ifdef DEBUG
         // All taken moves, for debug purposes
@@ -467,15 +504,6 @@ struct MctsSimulation {
         std::vector<std::vector<float>> all_current_res(ships.size());
 #endif
 
-        for (size_t i=0; i < frame.get_game().players.size(); i++) {
-            num_own_inspiring_ships.push_back(std::vector<int>(frame.get_board_size()));
-        }
-        // Initialization
-        for (auto& ship : ships) {
-            add_inspiration(num_inspiring_ships, ship.position, 1);
-            add_inspiration(num_own_inspiring_ships[ship.player], ship.position, 1);
-        }
-
         // Simulation
         for (int depth=0; depth < max_depth; depth++) {
             // Update ships and halite
@@ -483,8 +511,8 @@ struct MctsSimulation {
                 auto& ship = ships[ship_idx];
                 if (ship.destroyed) { continue; }
 
-                auto inspiration_count =
-                    num_inspiring_ships[ship.position]-num_own_inspiring_ships[ship.player][ship.position];
+                auto num_non_inspiring = num_own_inspiring_ships[ship.player][ship.position];
+                auto inspiration_count = num_inspiring_ships[ship.position]-num_non_inspiring;
                 bool is_inspired = (inspiration_count >= hlt::constants::INSPIRATION_SHIP_COUNT);
 
                 int move;
@@ -613,12 +641,25 @@ struct MctsSimulation {
         return res;
     }
 
-    static void update_inspiration(std::vector<int>& inspiration_grid, int position, int last_move) {
-        // TODO
+    // Update inspiration by moving a single ship. `position` is the new position of the ship.
+    void update_inspiration(std::vector<int>& inspiration_grid, int position, int last_move) {
+        if (INSPIRATION_ENABLED) {
+            int prev_pos = move_position(position, reverse_move(last_move));
+            add_inspiration(inspiration_grid, prev_pos, -1);
+            add_inspiration(inspiration_grid, position, 1);
+        }
     }
 
-    static void add_inspiration(std::vector<int>& inspiration_grid, int position, int amount) {
-        // TODO
+    void add_inspiration(std::vector<int>& inspiration_grid, int position, int amount) {
+        if (INSPIRATION_ENABLED) {
+            int radius = hlt::constants::INSPIRATION_RADIUS;
+            for (int dx=-(radius-1); dx < radius; dx++) {
+                int y_range = radius-1-std::abs(dx);
+                for (int dy=-y_range; dy <= y_range; dy++) {
+                    inspiration_grid[move_position(position, dx, dy)] += amount;
+                }
+            }
+        }
     }
 };
 
