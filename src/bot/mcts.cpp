@@ -119,12 +119,16 @@ struct MctsTreeNode {
     hlt::Direction best_move() {
         int best_child = 0;
         int best_visits = 0;
+#ifdef DEBUG
         float best_total_reward = 0;
+#endif
         for (unsigned int child_idx = 0; child_idx < ALL_DIRECTIONS.size(); child_idx++) {
             if (children[child_idx]->visits > best_visits) {
                 best_visits = children[child_idx]->visits;
                 best_child = child_idx;
+#ifdef DEBUG
                 best_total_reward = children[child_idx]->total_reward;
+#endif
             }
         }
 #ifdef DEBUG
