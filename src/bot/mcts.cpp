@@ -852,7 +852,8 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
             halite_per_turn_sum += mcts_trees[ship_idx].get_average_score();
         }
     }
-    bool spawn_desired = true;
+    // Otherwise it might build ships in the last turn if suicide strat is successful.
+    bool spawn_desired = (turns_left > 50);
     if (own_moves.size() > 0) {
         float expected_halite_per_turn = halite_per_turn_sum/own_moves.size();
         float expected_halite_total = expected_halite_per_turn*turns_left;
