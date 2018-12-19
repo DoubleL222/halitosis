@@ -17,25 +17,40 @@ const int MAX_DEPTH = 50;
 // turn
 const int NUM_INIT_SIMULATIONS = 10;
 
+// Whether ships should be considered one at a time.
+// If set to false, simulations will be reused to update all trees.
+const bool ISOLATE_SHIPS = false;
+
 // A container for moves that allows faster access than a vec of vecs
 struct ShipMoves {
     int num_ships;
+    // Set to -1 if all moves are counted. Otherwise only the specified ship has any moves.
+    int isolated_ship;
     std::vector<int> num_moves;
     std::vector<int> moves;
 
     ShipMoves(int num_ships)
       : num_ships(num_ships),
+        isolated_ship(-1),
         num_moves(num_ships),
         moves(num_ships*(MAX_DEPTH+1))
     {
     }
 
+    bool is_active(int ship_idx) const {
+        return isolated_ship == -1 || isolated_ship == ship_idx;
+    }
+
+    void isolate(int ship_idx) {
+        isolated_ship = ship_idx;
+    }
+
     int get_path_size(int ship_idx) const {
-        return num_moves[ship_idx];
+        return is_active(ship_idx) ? num_moves[ship_idx] : 0;
     }
 
     bool is_move_specified(int ship_idx, int depth) const {
-        return depth < num_moves[ship_idx];
+        return is_active(ship_idx) ? (depth < num_moves[ship_idx]) : false;
     }
 
     int get_move(int ship_idx, int depth) const {
@@ -697,16 +712,24 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
             // Sets the move in the ShipMoves buffer
             mcts_trees[ship_idx].tree_policy(simulation_moves, ship_idx);
         }
-
         //std::cerr << simulation_moves << std::endl;
 
         for (size_t possible_move = 0; possible_move < ALL_DIRECTIONS.size(); possible_move++) {
             for (size_t ship_idx=0; ship_idx < mcts_trees.size(); ship_idx++) {
                 simulation_moves.push_temp(ship_idx, possible_move);
             }
-            auto results = simulation.run(simulation_moves, MAX_DEPTH);
-            for (size_t ship_idx=0; ship_idx < mcts_trees.size(); ship_idx++) {
-                mcts_trees[ship_idx].update(simulation_moves, ship_idx, results[ship_idx]);
+
+            if (ISOLATE_SHIPS) {
+                for (size_t ship_idx=0; ship_idx < mcts_trees.size(); ship_idx++) {
+                    simulation_moves.isolate(ship_idx);
+                    auto results = simulation.run(simulation_moves, MAX_DEPTH);
+                    mcts_trees[ship_idx].update(simulation_moves, ship_idx, results[ship_idx]);
+                }
+            } else {
+                auto results = simulation.run(simulation_moves, MAX_DEPTH);
+                for (size_t ship_idx=0; ship_idx < mcts_trees.size(); ship_idx++) {
+                    mcts_trees[ship_idx].update(simulation_moves, ship_idx, results[ship_idx]);
+                }
             }
             for (size_t ship_idx=0; ship_idx < mcts_trees.size(); ship_idx++) {
                 simulation_moves.pop(ship_idx);
