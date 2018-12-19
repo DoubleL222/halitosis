@@ -508,6 +508,8 @@ struct MctsSimulation {
         std::vector<std::vector<float>> all_current_res(ships.size());
 #endif
 
+        int turns_left = hlt::constants::MAX_TURNS-frame.get_game().turn_number;
+        max_depth = std::min(turns_left, max_depth);
         // Simulation
         for (int depth=0; depth < max_depth; depth++) {
             // Update ships and halite
@@ -625,7 +627,12 @@ struct MctsSimulation {
                     ((float)hlt::constants::EXTRACT_RATIO)/hlt::constants::MOVE_COST_RATIO;
                 float remaining_turns =
                     get_distance_to_dropoff(ship.position, ship.player)*(1.0+turns_spent_mining);
-                res[ship_idx] = ((float)ship.halite)/(ship.turns_underway+remaining_turns);
+                if (max_depth+remaining_turns <= turns_left) {
+                    res[ship_idx] = ((float)ship.halite)/(ship.turns_underway+remaining_turns);
+                } else {
+                    // Not making it before the end of the game.
+                    res[ship_idx] = 0.0;
+                }
             }
         }
 
@@ -854,7 +861,7 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
             spawn_desired = false;
         }
     }
-    auto collision_res = frame.avoid_collisions(own_moves, false, spawn_desired);
+    auto collision_res = frame.avoid_collisions(own_moves, turns_left < 15, spawn_desired);
 
     std::vector<hlt::Command> commands;
     for (auto id_ship : game.me->ships) {
