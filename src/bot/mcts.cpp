@@ -829,7 +829,15 @@ std::vector<hlt::Command> MctsBot::run(const hlt::Game& game, time_point end_tim
     std::unordered_map<hlt::EntityId, hlt::Direction> own_moves;
     for (size_t ship_idx=0; ship_idx < all_ships.size(); ship_idx++) {
         if (all_ships[ship_idx]->owner == game.my_id) {
-            own_moves[all_ships[ship_idx]->id] = mcts_trees[ship_idx].best_move();
+            auto move = mcts_trees[ship_idx].best_move();
+            auto cell_halite = game.game_map->at(all_ships[ship_idx]->position)->halite;
+            auto ship_halite = all_ships[ship_idx]->halite;
+            // It is possible that ships can not take the desired move,
+            // which can cause a self-collision.
+            if (cell_halite/hlt::constants::MOVE_COST_RATIO > ship_halite) {
+                move = hlt::Direction::STILL;
+            }
+            own_moves[all_ships[ship_idx]->id] = move;
             halite_per_turn_sum += mcts_trees[ship_idx].get_average_score();
         }
     }
