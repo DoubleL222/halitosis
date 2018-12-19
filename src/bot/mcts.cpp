@@ -652,12 +652,58 @@ struct MctsSimulation {
         return res;
     }
 
+    const std::array<std::pair<int, int>, 7> INSPIRATION_FRONTIER_LEFT = {{
+        {0, -3}, {-1, -2}, {-2, -1}, {-3, 0}, {-2, 1}, {-1, 2}, {0, 3}
+    }};
+    const std::array<std::pair<int, int>, 7> INSPIRATION_FRONTIER_RIGHT = {{
+        {0, -3}, {1, -2}, {2, -1}, {3, 0}, {2, 1}, {1, 2}, {0, 3}
+    }};
+    const std::array<std::pair<int, int>, 7> INSPIRATION_FRONTIER_UP = {{
+        {-3, 0}, {-2, -1}, {-1, -2}, {0, -3}, {1, -2}, {2, -1}, {3, 0}
+    }};
+    const std::array<std::pair<int, int>, 7> INSPIRATION_FRONTIER_DOWN = {{
+        {-3, 0}, {-2, 1}, {-1, 2}, {0, 3}, {1, 2}, {2, 1}, {3, 0}
+    }};
+
     // Update inspiration by moving a single ship. `position` is the new position of the ship.
     void update_inspiration(std::vector<int>& inspiration_grid, int position, int last_move) {
         if (INSPIRATION_ENABLED) {
             int prev_pos = move_position(position, reverse_move(last_move));
-            add_inspiration(inspiration_grid, prev_pos, -1);
-            add_inspiration(inspiration_grid, position, 1);
+            switch (last_move) {
+                case STILL_INDEX: return;
+                case NORTH_INDEX:
+                    for (auto delta : INSPIRATION_FRONTIER_DOWN) {
+                        inspiration_grid[move_position(prev_pos, delta.first, delta.second)]--;
+                    }
+                    for (auto delta : INSPIRATION_FRONTIER_UP) {
+                        inspiration_grid[move_position(position, delta.first, delta.second)]++;
+                    }
+                    break;
+                case SOUTH_INDEX:
+                    for (auto delta : INSPIRATION_FRONTIER_UP) {
+                        inspiration_grid[move_position(prev_pos, delta.first, delta.second)]--;
+                    }
+                    for (auto delta : INSPIRATION_FRONTIER_DOWN) {
+                        inspiration_grid[move_position(position, delta.first, delta.second)]++;
+                    }
+                    break;
+                case EAST_INDEX:
+                    for (auto delta : INSPIRATION_FRONTIER_LEFT) {
+                        inspiration_grid[move_position(prev_pos, delta.first, delta.second)]--;
+                    }
+                    for (auto delta : INSPIRATION_FRONTIER_RIGHT) {
+                        inspiration_grid[move_position(position, delta.first, delta.second)]++;
+                    }
+                    break;
+                case WEST_INDEX:
+                    for (auto delta : INSPIRATION_FRONTIER_RIGHT) {
+                        inspiration_grid[move_position(prev_pos, delta.first, delta.second)]--;
+                    }
+                    for (auto delta : INSPIRATION_FRONTIER_LEFT) {
+                        inspiration_grid[move_position(position, delta.first, delta.second)]++;
+                    }
+                    break;
+            }
         }
     }
 
