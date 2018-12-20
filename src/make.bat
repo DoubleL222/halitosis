@@ -50,3 +50,8 @@ cl.exe /FeMyBot.exe /std:c++14 /O2 /MT /EHsc /I . /Fo.\obj\ ^
  .\bot\frame.cpp ^
  .\bot\first.cpp ^
  .\bot\game_clone.cpp ^
+ .\bot\plan.cpp ^
+ .\bot\mcts.cpp ^
+ .\bot\math.cpp ^
+ .\bot\gravity_grid.cpp ^
+ .\bot\gravitybot.cpp ^
